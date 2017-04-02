@@ -25,7 +25,7 @@ switch ($method) {
     case 'GET':
         if($request[1] == "user"){
             if(isset($_GET["imei"]) && isset($_GET["userAuth"])){
-                $Device["emei"] = $_GET["imei"];
+                $Device["imei"] = $_GET["imei"];
                 $Device["Applications"]["Snapchat"]["apkName"] = "Snapchat-2.8.9.apk";
                 $User["Name"] = "Mattias";
                 $User["Email"] = "matkag@kth.se";

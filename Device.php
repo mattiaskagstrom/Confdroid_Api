@@ -9,7 +9,7 @@
 class Device
 {
 
-    private $id, $name, $imei, $applications;
+    private $id, $name, $imei, $applications = array();
 
     function __construct($id, $name, $imei){
         $this->id = $id;
@@ -29,6 +29,7 @@ class Device
     }
 
     function getObject(){
+
         $device["name"] = $this->name;
         $device["imei"] = $this->imei;
         $device["applications"] = $this->applications;
@@ -36,7 +37,7 @@ class Device
     }
 
     function addApplication($application){
-        array_push($this->applications, $application);
+        array_push($this->applications, $application->getObject());
     }
 
     public function getApplications()

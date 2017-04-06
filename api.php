@@ -52,7 +52,7 @@ switch ($method) {
 }
 switch ($fileType) {
     case 'json':
-        echo json_encode($output);
+        echo json_encode($output, JSON_UNESCAPED_UNICODE );
         break;
     case 'xml':
         echo "Not supported";

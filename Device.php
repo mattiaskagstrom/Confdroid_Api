@@ -9,12 +9,12 @@
 class Device
 {
 
-    private $name, $imei, $applications;
+    private $id, $name, $imei, $applications;
 
-    function __construct($name, $imei, $applications){
+    function __construct($id, $name, $imei){
+        $this->id = $id;
         $this->name = $name;
         $this->imei = $imei;
-        $this->applications = $applications;
     }
 
     function __sleep()
@@ -42,6 +42,11 @@ class Device
     public function getApplications()
     {
         return $this->applications;
+    }
+
+    public function getId()
+    {
+        return $this->id;
     }
 
     public function getName()

@@ -12,13 +12,13 @@ spl_autoload_register(function ($class_name) {
 class User
 {
 
-    private $name, $email, $devices, $groups;
+    private $id, $name, $email, $devices = array(), $groups = array();
 
-    function __construct($name, $email, $devices, $groups){
+    function __construct($id, $name, $email)
+    {
+        $this->id = $id;
         $this->name = $name;
         $this->email = $email;
-        $this->devices = $devices;
-        $this->groups = $groups;
     }
 
     function __sleep()
@@ -62,5 +62,10 @@ class User
 
     public function getGroups(){
         return $this->groups;
+    }
+
+    public function getId()
+    {
+        return $this->id;
     }
 }

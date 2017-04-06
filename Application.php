@@ -10,10 +10,11 @@ class Application
 {
 
 
-    private $forceInstall, $dataDir, $apkName,$apkURL,$name,$SQL_settings,$XML_settings ;
+    private $id, $forceInstall, $dataDir, $apkName,$apkURL,$name,$SQL_settings = array(),$XML_settings = array();
 
-    function __construct($dataDir,$apkName,$apkURL,$name,$forceInstall)
+    function __construct($id, $dataDir,$apkName,$apkURL,$name,$forceInstall)
     {
+        $this->id = $id;
         $this->apkName = $apkName;
         $this->apkURL = $apkURL;
         $this->dataDir = $dataDir;
@@ -41,6 +42,14 @@ class Application
     function addXML_setting($XML_setting){
         array_push($this->XML_settings,$XML_setting);
 
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getId()
+    {
+        return $this->id;
     }
 
     /**

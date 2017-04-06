@@ -52,12 +52,22 @@ class DatabaseConnection
             $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
             $user = new User($dbuser["id"], $dbuser["name"], $dbuser["mail"]);
 
-
+            $stmt = $this->dbc->prepare("SELECT id, apk_name, apk_url, force_install, data_dir, friendly_name FROM application, application_device WHERE application.id = application_device.application_id AND application_device.device_id =:deviceID");
             foreach ($devices as $device) {
                 $newDevice = new Device($device["id"], $device["name"], $device["imei"]);
+                $deviceID = $newDevice->getId();
+                $stmt->bindParam(":deviceID", $deviceID);
+                $stmt->execute();
 
+                $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($applications as $application) {
+                    $newDevice->addApplication(new Application($application["id"], $application["data_dir"], $application["apk_name"],$application["apk_url"],$application["friendly_name"],$application["force_install"]));
+                }
                 $user->addDevice($newDevice);
+
             }
+
             return $user->getObject();
         }else{
             return "bamboozle!";

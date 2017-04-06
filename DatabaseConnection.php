@@ -9,20 +9,23 @@
 spl_autoload_register(function ($class_name) {
     include $class_name . '.php';
 });
+
+
 class DatabaseConnection
 {
+    private $dbc;
     function __construct()
     {
         $dsn = 'mysql:host=localhost;dbname=confdroid_test';
-        $username = 'root';
-        $password = '';
+        $username = 'confdroid_test';
+        $password = 'tutus';
         $options = array(
             PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
         );
-        $dbh = new PDO($dsn, $username, $password, $options);
+        $this->dbc = new PDO($dsn, $username, $password, $options);
 
-        //$stmt = $dbh->prepare("SELECT * FROM users");
-        //$stmt->execute();
+
+
     }
 
     public function login($username, $password){
@@ -32,18 +35,32 @@ class DatabaseConnection
     public function get($request){
         if($request[1] == "user"){
 
-            if(isset($_GET["imei"])){
-                $Device["imei"] = $_GET["imei"];
-                $Device["Applications"]["Snapchat"]["apkName"] = "Snapchat-2.8.9.apk";
-                $User["Name"] = "Mattias";
-                $User["Email"] = "matkag@kth.se";
-                $User["Devices"][$_GET["imei"]] = $Device;
-                $User["Groups"] = array("Tidaa", "Tutus");
+            $stmt = $this->dbc->prepare("SELECT id, name, mail FROM user WHERE auth_token=:authToken");
+            $stmt->bindParam(":authToken", $_GET["userAuth"]);
+            $stmt->execute();
+            $dbuser = $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
 
-                return $User;
+            if(isset($_GET["imei"])){
+               $stmt = $this->dbc->prepare("SELECT id, name, imei FROM device, user_device WHERE device.id = user_device.device_id AND user_device.user_id = :userID AND device.imei = :imei");
+               $stmt->bindParam(":userID", $dbuser["id"]);
+               $stmt->bindParam("imei", $_GET["imei"]);
             }else{
-                die("Missing variables");
+                $stmt = $this->dbc->prepare("SELECT id, name, imei FROM device, user_device WHERE device.id = user_device.device_id AND user_device.user_id = :userID");
+                $stmt->bindParam(":userID", $dbuser["id"]);
             }
+            $stmt->execute();
+            $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $user = new User($dbuser["id"], $dbuser["name"], $dbuser["mail"]);
+
+
+            foreach ($devices as $device) {
+                $newDevice = new Device($device["id"], $device["name"], $device["imei"]);
+
+                $user->addDevice($newDevice);
+            }
+            return $user->getObject();
+        }else{
+            return "bamboozle!";
         }
     }
 

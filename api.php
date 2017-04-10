@@ -10,9 +10,6 @@ spl_autoload_register(function ($class_name) {
     include $class_name . '.php';
 });
 
-if(!isset($_GET["userAuth"])){
-    die("userAuth token missing.");
-}
 $method = $_SERVER['REQUEST_METHOD'];
 //remove the filetype from the string, so we can use it later
 $request = explode(".", $_GET["url"]);
@@ -30,7 +27,7 @@ switch ($method) {
         //do_something_with_put($request);
         break;
     case 'POST':
-        //do_something_with_post($request);
+        $output = $db->post($request);
         break;
     case 'GET':
         $output = $db->get($request);

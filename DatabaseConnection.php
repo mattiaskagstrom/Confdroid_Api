@@ -28,12 +28,16 @@ class DatabaseConnection
         );
         $this->dbc = new PDO($dsn, $username, $password, $options);
 
-
-
     }
 
-    public function login($username, $password){
+    private function login($username, $password)
+    {
+        $stmt = $this->dbc->prepare("SELECT id FROM admin WHERE username=:username AND password=:password");
+        $stmt->bindParam(":username", $username);
+        $stmt->bindParam(":password", $password);
+        $stmt->execute();
 
+        $loggedInId = $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
     }
 
 
@@ -44,18 +48,28 @@ class DatabaseConnection
      */
     public function get($request){
         if($request[1] == "user" && !isset($request[2])){
+            if(!isset($_GET["userAuth"])){
+                die("userAuth token missing.");
+            }
             if(isset($_GET["imei"])){
                 return $this->getUser($_GET["userAuth"], $_GET["imei"]);
-            }else{
+            }
+            else{
                 return $this->getUser($_GET["userAuth"]);
             }
-        }else{
+        }
+        else{
             return "No such unit to get";
         }
     }
 
     public function post($request){
-
+        if($request[1] == "admin" && $request[2] == "login"){
+            $this->login($_POST["username"], $_POST["password"]);
+        }
+        else{
+            return "No such unit to get";
+        }
     }
 
     public function put($request){

@@ -37,20 +37,23 @@ class DatabaseConnection
         $stmt->bindParam(":password", $password);
         $stmt->execute();
 
-        $loggedInId = $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
+
+        $checking = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $loggedInId = null;
+        if(isset($checking[0]))
+            $loggedInId = $checking[0];
         if($loggedInId == null)
-            return false;
+            return "Failed login";
         else
         {
             $token = bin2hex(openssl_random_pseudo_bytes(16));
-            var_dump($token);
             $_SESSION["adminAuthToken"] = $token;
             $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken WHERE username=:username AND password=:password ");
             $insertAuth->bindParam(":authToken", $token);
             $insertAuth->bindParam(":username", $username);
             $insertAuth->bindParam(":password", $password);
             $insertAuth->execute();
-            return true;
+            return $token;
         }
 
     }

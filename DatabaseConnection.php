@@ -38,6 +38,21 @@ class DatabaseConnection
         $stmt->execute();
 
         $loggedInId = $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
+        if($loggedInId == null)
+            return false;
+        else
+        {
+            $token = bin2hex(openssl_random_pseudo_bytes(16));
+            var_dump($token);
+            $_SESSION["adminAuthToken"] = $token;
+            $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken WHERE username=:username AND password=:password ");
+            $insertAuth->bindParam(":authToken", $token);
+            $insertAuth->bindParam(":username", $username);
+            $insertAuth->bindParam(":password", $password);
+            $insertAuth->execute();
+            return true;
+        }
+
     }
 
 
@@ -65,7 +80,7 @@ class DatabaseConnection
 
     public function post($request){
         if($request[1] == "admin" && $request[2] == "login"){
-            $this->login($_POST["username"], $_POST["password"]);
+            return $this->login($_POST["username"], $_POST["password"]);
         }
         else{
             return "No such unit to get";

@@ -5,7 +5,7 @@
  * Date: 2017-03-31
  * Time: 00:37
  */
-
+session_start();        //start the session
 spl_autoload_register(function ($class_name) {
     include $class_name . '.php';
 });

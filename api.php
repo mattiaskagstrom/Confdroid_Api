@@ -6,6 +6,7 @@
  * Time: 00:37
  */
 session_start();        //start the session
+header('Access-Control-Allow-Origin: *');
 spl_autoload_register(function ($class_name) {
     include $class_name . '.php';
 });
@@ -28,6 +29,7 @@ switch ($method) {
         break;
     case 'POST':
         $output = $db->post($request);
+
         break;
     case 'GET':
         $output = $db->get($request);
@@ -56,7 +58,6 @@ switch ($fileType) {
         break;
     case 'html':
         echo "<pre>";
-
         print_r($output);
         echo "</pre>";
         break;

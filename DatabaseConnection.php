@@ -30,39 +30,6 @@ class DatabaseConnection
 
     }
 
-    private function login($username, $password)
-    {
-        $stmt = $this->dbc->prepare("SELECT id FROM admin WHERE username=:username AND password=:password");
-        $stmt->bindParam(":username", $username);
-        $stmt->bindParam(":password", $password);
-        $stmt->execute();
-
-
-        $checking = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $userSession["id"] = null;
-        $userSession["Token"] = null;
-        if (isset($checking[0]))
-            $userSession["id"] = $checking[0];
-        if ($userSession["id"] == null){
-            $userSession["Token"] = "Failed";
-            return $userSession;
-        }
-        else
-        {
-            $token = bin2hex(openssl_random_pseudo_bytes(16));
-            $_SESSION["adminAuthToken"] = $token;
-            $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken WHERE username=:username AND password=:password ");
-            $insertAuth->bindParam(":authToken", $token);
-            $insertAuth->bindParam(":username", $username);
-            $insertAuth->bindParam(":password", $password);
-            $insertAuth->execute();
-            $userSession["Token"] = $token;
-            return $userSession;
-        }
-
-    }
-
-
     /**
      * Split the get request into the data fetching functions for each unit
      * @param $request to handle
@@ -86,8 +53,11 @@ class DatabaseConnection
     }
 
     public function post($request){
-        if($request[1] == "admin" && $request[2] == "login"){
-            return $this->login($_POST["username"], $_POST["password"]);
+        if($request[1] == "admin"){
+            if($request[2] == "login")
+                return $this->login($_POST["username"], $_POST["password"]);
+            else if($request[2] == "authorize")
+                return $this->authorizeUser($_POST["authToken"], $_POST["id"]);
         }
         else{
             return "No such unit to get";
@@ -146,5 +116,55 @@ class DatabaseConnection
         }
 
         return $user->getObject();
+    }
+
+    private function login($username, $password)
+    {
+        $stmt = $this->dbc->prepare("SELECT id FROM admin WHERE username=:username AND password=:password");
+        $stmt->bindParam(":username", $username);
+        $stmt->bindParam(":password", $password);
+        $stmt->execute();
+
+
+        $user = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $userSession["id"] = null;
+        $userSession["Token"] = null;
+        if (isset($user[0]["id"]))
+            $userSession["id"] = $user[0]["id"];
+        if ($userSession["id"] == null){
+            $userSession["Token"] = "Failed";
+            return $userSession;
+        }
+        else
+        {
+            $token = bin2hex(openssl_random_pseudo_bytes(16));
+            $_SESSION["adminAuthToken"] = $token;
+            $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken WHERE username=:username AND password=:password ");
+            $insertAuth->bindParam(":authToken", $token);
+            $insertAuth->bindParam(":username", $username);
+            $insertAuth->bindParam(":password", $password);
+            $insertAuth->execute();
+            $userSession["Token"] = $token;
+            return $userSession;
+        }
+
+    }
+
+    private function authorizeUser($authToken, $userId)
+    {
+        $stmt = $this->dbc->prepare("SELECT authToken FROM admin WHERE id=:id AND authToken=:authToken");
+        $stmt->bindParam(":id", $userId);
+        $stmt->bindParam(":authToken", $authToken);
+        $stmt->execute();
+
+        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $retValue["auth"] = null;
+        if($stmtAnswer[0]["authToken"] == null)
+        {
+            $retValue["auth"] = false;
+            return $retValue;
+        }
+        $retValue["auth"] = true;
+        return $retValue;
     }
 }

@@ -39,11 +39,14 @@ class DatabaseConnection
 
 
         $checking = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $loggedInId = null;
-        if(isset($checking[0]))
-            $loggedInId = $checking[0];
-        if($loggedInId == null)
-            return "Failed login";
+        $userSession["id"] = null;
+        $userSession["Token"] = null;
+        if (isset($checking[0]))
+            $userSession["id"] = $checking[0];
+        if ($userSession["id"] == null){
+            $userSession["Token"] = "Failed";
+            return $userSession;
+        }
         else
         {
             $token = bin2hex(openssl_random_pseudo_bytes(16));
@@ -53,7 +56,8 @@ class DatabaseConnection
             $insertAuth->bindParam(":username", $username);
             $insertAuth->bindParam(":password", $password);
             $insertAuth->execute();
-            return $token;
+            $userSession["Token"] = $token;
+            return $userSession;
         }
 
     }

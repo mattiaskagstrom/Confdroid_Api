@@ -143,7 +143,6 @@ class DatabaseConnection
         else
         {
             $token = bin2hex(openssl_random_pseudo_bytes(16));
-            $_SESSION["adminAuthToken"] = $token;
             $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken WHERE username=:username AND password=:password ");
             $insertAuth->bindParam(":authToken", $token);
             $insertAuth->bindParam(":username", $username);

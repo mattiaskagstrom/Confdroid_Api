@@ -6,6 +6,8 @@
  * Date: 2017-04-04
  * Time: 11:18
  */
+session_start();
+
 spl_autoload_register(function ($class_name) {
     include $class_name . '.php';
 });
@@ -57,7 +59,10 @@ class DatabaseConnection
             if($request[2] == "login")
                 return $this->login($_POST["username"], $_POST["password"]);
             else if($request[2] == "authorize")
-                return $this->authorizeUser($_POST["authToken"], $_POST["id"]);
+                return $this->authorizeAdmin($_POST["authToken"], $_POST["id"]);
+            else if($request[2] == "searchUser")
+                return 1;
+
         }
         else{
             return "No such unit to get";
@@ -150,10 +155,15 @@ class DatabaseConnection
 
     }
 
-    private function authorizeUser($authToken, $userId)
+    private function authorizeAdmin($authToken, $adminId)
     {
+        if(isset($_SESSION["authToken"]) && isset($_SESSION["adminId"]))
+        {
+            if($_SESSION["authToken"] == $authToken && $_SESSION["adminId"] == $adminId)
+                return true;
+        }
         $stmt = $this->dbc->prepare("SELECT authToken FROM admin WHERE id=:id AND authToken=:authToken");
-        $stmt->bindParam(":id", $userId);
+        $stmt->bindParam(":id", $adminId);
         $stmt->bindParam(":authToken", $authToken);
         $stmt->execute();
 
@@ -165,6 +175,8 @@ class DatabaseConnection
             return $retValue;
         }
         $retValue["auth"] = true;
+        $_SESSION["authToken"] = $authToken;
+        $_SESSION["adminId"] = $adminId;
         return $retValue;
     }
 }

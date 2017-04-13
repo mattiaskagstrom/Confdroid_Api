@@ -6,8 +6,6 @@
  * Date: 2017-04-04
  * Time: 11:18
  */
-session_start();
-
 spl_autoload_register(function ($class_name) {
     include $class_name . '.php';
 });
@@ -16,6 +14,8 @@ spl_autoload_register(function ($class_name) {
 class DatabaseConnection
 {
     private $dbc;
+    private $applicationFunctions;
+    private $adminFunctions;
 
     /**
      * DatabaseConnection constructor.
@@ -29,7 +29,8 @@ class DatabaseConnection
             PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
         );
         $this->dbc = new PDO($dsn, $username, $password, $options);
-
+        $this->applicationFunctions = new ApplicationFunctoins($this->dbc);
+        $this->adminFunctions = new AdminFunctions($this->dbc);
     }
 
     /**
@@ -43,10 +44,14 @@ class DatabaseConnection
                 die("userAuth token missing.");
             }
             if(isset($_GET["imei"])){
-                return $this->getUser($_GET["userAuth"], $_GET["imei"]);
-            }
-            else{
-                return $this->getUser($_GET["userAuth"]);
+                $userValues = $this->applicationFunctions->authorizeUser($_GET["userAuth"]);    //Gets User
+                $user = new User($userValues["id"], $userValues["name"], $userValues["mail"]);  //Create User from authorized user
+                $device = $this->applicationFunctions->getDevice($user->getId(), $_GET["imei"]);//Gets Device
+                if($device == null)
+                    return "No device on this imei, contact administration for support";
+                $device = $this->applicationFunctions->getAplications($device);                 //Gets the device applications
+                $user->addDevice($device);                                                      //Add device to the user
+                return $user->getObject();
             }
         }
         else{
@@ -60,7 +65,7 @@ class DatabaseConnection
                 return $this->login($_POST["username"], $_POST["password"]);
             else if($request[2] == "authorize")
                 return $this->authorizeAdmin($_POST["authToken"], $_POST["id"]);
-            else if($request[2] == "searchUser")
+            else if($request[2] == "search")
                 return 1;
 
         }
@@ -79,48 +84,6 @@ class DatabaseConnection
 
     private function sqlQuery(){
         //SELECT user.name, device.name FROM device, user, user_device WHERE user_device.user_id = user.id AND user_device.device_id = device.id
-    }
-
-    /**
-     * @param $userAuth, the authentication token for the user to get
-     * @param $imei is optional, fetches all if not specified.
-     * @return md array with the requested user and its device(es).
-     */
-    private function getUser($userAuth, $imei = null){
-        $stmt = $this->dbc->prepare("SELECT id, name, mail FROM user WHERE auth_token=:authToken");
-        $stmt->bindParam(":authToken", $userAuth);
-        $stmt->execute();
-        $dbuser = $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
-
-        if($imei != null){
-            $stmt = $this->dbc->prepare("SELECT id, name, imei FROM device, user_device WHERE device.id = user_device.device_id AND user_device.user_id = :userID AND device.imei = :imei");
-            $stmt->bindParam(":userID", $dbuser["id"]);
-            $stmt->bindParam("imei", $imei);
-        }else{
-            $stmt = $this->dbc->prepare("SELECT id, name, imei FROM device, user_device WHERE device.id = user_device.device_id AND user_device.user_id = :userID");
-            $stmt->bindParam(":userID", $dbuser["id"]);
-        }
-        $stmt->execute();
-        $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $user = new User($dbuser["id"], $dbuser["name"], $dbuser["mail"]);
-
-        $stmt = $this->dbc->prepare("SELECT id, apk_name, apk_url, force_install, data_dir, friendly_name FROM application, application_device WHERE application.id = application_device.application_id AND application_device.device_id =:deviceID");
-        foreach ($devices as $device) {
-            $newDevice = new Device($device["id"], $device["name"], $device["imei"]);
-            $deviceID = $newDevice->getId();
-            $stmt->bindParam(":deviceID", $deviceID);
-            $stmt->execute();
-
-            $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($applications as $application) {
-                $newDevice->addApplication(new Application($application["id"], $application["data_dir"], $application["apk_name"],$application["apk_url"],$application["friendly_name"],$application["force_install"]));
-            }
-            $user->addDevice($newDevice);
-
-        }
-
-        return $user->getObject();
     }
 
     private function login($username, $password)
@@ -149,9 +112,25 @@ class DatabaseConnection
             $insertAuth->bindParam(":password", $password);
             $insertAuth->execute();
             $userSession["Token"] = $token;
+            $_SESSION["authToken"] = $token;
+            $_SESSION["adminId"] = $user[0]["id"];
             return $userSession;
         }
 
+    }
+
+    /**
+     * @param string $name
+     * @param string $mail
+     * @return User
+     */
+    private function getUser($name = "", $mail = "")
+    {
+        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE :name AND mail LIKE :mail");
+        $stmt->bindParam(":name", $name);
+        $stmt->bindParam(":mail", $mail);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
     }
 
     private function authorizeAdmin($authToken, $adminId)
@@ -161,21 +140,21 @@ class DatabaseConnection
             if($_SESSION["authToken"] == $authToken && $_SESSION["adminId"] == $adminId)
                 return true;
         }
-        $stmt = $this->dbc->prepare("SELECT authToken FROM admin WHERE id=:id AND authToken=:authToken");
-        $stmt->bindParam(":id", $adminId);
-        $stmt->bindParam(":authToken", $authToken);
-        $stmt->execute();
-
-        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $retValue["auth"] = null;
-        if($stmtAnswer[0]["authToken"] == null)
-        {
-            $retValue["auth"] = false;
-            return $retValue;
-        }
-        $retValue["auth"] = true;
-        $_SESSION["authToken"] = $authToken;
-        $_SESSION["adminId"] = $adminId;
-        return $retValue;
+//        $stmt = $this->dbc->prepare("SELECT authToken FROM admin WHERE id=:id AND authToken=:authToken");
+//        $stmt->bindParam(":id", $adminId);
+//        $stmt->bindParam(":authToken", $authToken);
+//        $stmt->execute();
+//
+//        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+//        $retValue["auth"] = null;
+//        if($stmtAnswer[0]["authToken"] == null)
+//        {
+//            $retValue["auth"] = false;
+//            return $retValue;
+//        }
+//        $retValue["auth"] = true;
+//
+//        $_SESSION[""];
+//        return $retValue;
     }
 }

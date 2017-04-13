@@ -24,7 +24,7 @@ class Application
 
 
     function getObject(){
-        $application['name'] = $this->name;
+        $application['friendly_name'] = $this->name;
         $application['apkName'] = $this->apkName;
         $application['forceInstall'] = $this->forceInstall;
         $application['dataDir'] = $this->dataDir;

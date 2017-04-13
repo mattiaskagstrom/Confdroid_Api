@@ -101,9 +101,17 @@ class DatabaseConnection
             $stmt->execute();
 
             $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+            $stmt2 = $this->dbc->prepare("SELECT sql_setting.sql_setting, sql_setting.sql_location FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
             foreach ($applications as $application) {
-                $newDevice->addApplication(new Application($application["id"], $application["data_dir"], $application["apk_name"],$application["apk_url"],$application["friendly_name"],$application["force_install"]));
+                $stmt2->bindParam(":appID", $application["id"]);
+                $stmt2->execute();
+                $settings = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+                $app = new Application($application["id"], $application["data_dir"], $application["apk_name"],$application["apk_url"],$application["friendly_name"],$application["force_install"]);
+                foreach ($settings as $setting) {
+                    $app->addSQL_setting(new SqlSetting($setting["sql_location"], $setting["sql_setting"]));
+                }
+
+                $newDevice->addApplication($app);
             }
             $user->addDevice($newDevice);
 

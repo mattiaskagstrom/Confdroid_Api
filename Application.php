@@ -23,7 +23,7 @@ class Application
     }
 
 
-    function getObject(){
+    public function getObject(){
         $application['name'] = $this->name;
         $application['apkName'] = $this->apkName;
         $application['forceInstall'] = $this->forceInstall;
@@ -34,12 +34,14 @@ class Application
         return $application;
     }
 
-    function addSQL_setting($SQL_setting){
-        array_push($this->SQL_settings,$SQL_setting);
+
+
+    public function addSQL_setting($SQL_setting){
+        array_push($this->SQL_settings,$SQL_setting->getObject());
 
     }
 
-    function addXML_setting($XML_setting){
+    public function addXML_setting($XML_setting){
         array_push($this->XML_settings,$XML_setting);
 
     }

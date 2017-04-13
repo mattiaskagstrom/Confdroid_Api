@@ -62,9 +62,9 @@ class DatabaseConnection
     public function post($request){
         if($request[1] == "admin"){
             if($request[2] == "login")
-                return $this->login($_POST["username"], $_POST["password"]);
+                return $this->adminFunctions->login($_POST["username"], $_POST["password"]);
             else if($request[2] == "authorize")
-                return $this->authorizeAdmin($_POST["authToken"], $_POST["id"]);
+                return $this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]);
             else if($request[2] == "search")
                 return 1;
 
@@ -86,75 +86,8 @@ class DatabaseConnection
         //SELECT user.name, device.name FROM device, user, user_device WHERE user_device.user_id = user.id AND user_device.device_id = device.id
     }
 
-    private function login($username, $password)
-    {
-        $stmt = $this->dbc->prepare("SELECT id FROM admin WHERE username=:username AND password=:password");
-        $stmt->bindParam(":username", $username);
-        $stmt->bindParam(":password", $password);
-        $stmt->execute();
 
 
-        $user = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $userSession["id"] = null;
-        $userSession["Token"] = null;
-        if (isset($user[0]["id"]))
-            $userSession["id"] = $user[0]["id"];
-        if ($userSession["id"] == null){
-            $userSession["Token"] = "Failed";
-            return $userSession;
-        }
-        else
-        {
-            $token = bin2hex(openssl_random_pseudo_bytes(16));
-            $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken WHERE username=:username AND password=:password ");
-            $insertAuth->bindParam(":authToken", $token);
-            $insertAuth->bindParam(":username", $username);
-            $insertAuth->bindParam(":password", $password);
-            $insertAuth->execute();
-            $userSession["Token"] = $token;
-            $_SESSION["authToken"] = $token;
-            $_SESSION["adminId"] = $user[0]["id"];
-            return $userSession;
-        }
 
-    }
 
-    /**
-     * @param string $name
-     * @param string $mail
-     * @return User
-     */
-    private function getUser($name = "", $mail = "")
-    {
-        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE :name AND mail LIKE :mail");
-        $stmt->bindParam(":name", $name);
-        $stmt->bindParam(":mail", $mail);
-        $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
-    }
-
-    private function authorizeAdmin($authToken, $adminId)
-    {
-        if(isset($_SESSION["authToken"]) && isset($_SESSION["adminId"]))
-        {
-            if($_SESSION["authToken"] == $authToken && $_SESSION["adminId"] == $adminId)
-                return true;
-        }
-//        $stmt = $this->dbc->prepare("SELECT authToken FROM admin WHERE id=:id AND authToken=:authToken");
-//        $stmt->bindParam(":id", $adminId);
-//        $stmt->bindParam(":authToken", $authToken);
-//        $stmt->execute();
-//
-//        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
-//        $retValue["auth"] = null;
-//        if($stmtAnswer[0]["authToken"] == null)
-//        {
-//            $retValue["auth"] = false;
-//            return $retValue;
-//        }
-//        $retValue["auth"] = true;
-//
-//        $_SESSION[""];
-//        return $retValue;
-    }
 }

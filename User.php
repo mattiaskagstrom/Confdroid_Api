@@ -14,7 +14,7 @@ class User
 
     private $id, $name, $email, $devices = array(), $groups = array(), $authToken, $dateCreated;
 
-    function __construct($id, $name, $email, $authToken, $dateCreated)
+    function __construct($id, $name, $email, $authToken = null, $dateCreated = null)
     {
         $this->id = $id;
         $this->name = $name;
@@ -61,7 +61,15 @@ class User
     }
 
     public function addGroup($group){
-        array_push($this->groups, $group);
+        array_push($this->groups, $group->getObject());
+    }
+
+    /**
+     * @param $devices Device[]
+     */
+    public function addGroups($groups){
+        for ($i = 0; $i < count($groups); $i++)
+            $this->addGroup($groups[$i]);
     }
 
     public function getName(){

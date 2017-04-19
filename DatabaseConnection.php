@@ -47,7 +47,7 @@ class DatabaseConnection
                 $device = $this->applicationFunctions->getDevice($user->getId(), $_GET["imei"]);//Gets Device
                 if ($device == null)
                     return "No device on this imei, contact administration for support";
-                $device = $this->applicationFunctions->getApplications($device);                 //Gets the device applications
+                $device = $this->getApplications($device);                 //Gets the device applications
             }
             $user->addDevice($device);                                                      //Add device to the user
             return $user->getObject();
@@ -65,7 +65,10 @@ class DatabaseConnection
             else if ($request[2] == "authorize")
                 return $this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]);
             else if ($request[2] == "search") {
-                $users = $this->adminFunctions->searchUsers("a", "");
+                if($this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]))
+                    $users = $this->adminFunctions->searchUsers($_POST["searchValue"], $_POST["searchValue"]);
+                else
+                    $users[0] = "Not Authorized";
                 return $users;
             }
 

@@ -11,7 +11,7 @@ class Device
 
     private $id, $name, $imei, $applications = array(), $dateCreated;
 
-    function __construct($id, $name, $imei, $dateCreated){
+    function __construct($id, $name, $imei, $dateCreated = null){
         $this->id = $id;
         $this->name = $name;
         $this->imei = $imei;
@@ -33,8 +33,8 @@ class Device
 
         $device["name"] = $this->name;
         $device["imei"] = $this->imei;
-        $device["applications"] = $this->applications;
         $device["dateCreated"] = $this->dateCreated;
+        $device["applications"] = $this->applications;
         return $device;
     }
 

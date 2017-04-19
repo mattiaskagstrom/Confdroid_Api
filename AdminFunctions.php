@@ -28,27 +28,27 @@ class AdminFunctions
         $stmt->execute();
 
         $user = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $userSession["id"] = null;
-        $userSession["Token"] = null;
+        $adminSession["id"] = null;
+        $adminSession["Token"] = null;
 
         if (!isset($user[0]["id"]))                 //If does not exist a matching username and password return failed
         {
-            $userSession["Token"] = "Failed";
-            return $userSession;
+            $adminSession["Token"] = "Failed";
+            return $adminSession;
         }
         else
         {
-            $userSession["id"] = $user[0]["id"];
+            $adminSession["id"] = $user[0]["id"];
             $token = bin2hex(openssl_random_pseudo_bytes(16));          //Creates random hex Token
             $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken WHERE username=:username AND password=:password ");
             $insertAuth->bindParam(":authToken", $token);
             $insertAuth->bindParam(":username", $username);
             $insertAuth->bindParam(":password", $password);
             $insertAuth->execute();
-            $userSession["Token"] = $token;
+            $adminSession["Token"] = $token;
             $_SESSION["authToken"] = $token;                                    //Starts session variables used in authorzation
             $_SESSION["adminId"] = $user[0]["id"];
-            return $userSession;
+            return $adminSession;
         }
     }
 
@@ -83,13 +83,17 @@ class AdminFunctions
         $stmt->execute();
         $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $i = 0;
-        foreach ($queriedUsers as $user)
-        {
-            $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
-            $users[$i]->addDevices($this->getDevices($user["id"]));
-            $users[$i] = $users[$i]->getObject();
-            $i++;
+        if(isset($queriedUsers[0])) {
+            foreach ($queriedUsers as $user) {
+                $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
+                $users[$i]->addDevices($this->getDevices($user["id"]));
+                $users[$i]->addGroups($this->getGroups($user["id"]));
+                $users[$i] = $users[$i]->getObject();
+                $i++;
+            }
+            return $users;
         }
+        $users[0] = "Failed";
         return $users;
     }
 
@@ -107,8 +111,66 @@ class AdminFunctions
         if(isset($stmtAnswer[0]))
         {
             for($i = 0; $i < count($stmtAnswer); $i++)
+            {
                 $devices[$i] = new Device($stmtAnswer[$i]["id"], $stmtAnswer[$i]["name"], $stmtAnswer[$i]["imei"], $stmtAnswer[$i]["date_created"]);
+                $devices[$i] = $this->getApplications($devices[$i]);
+            }
             return $devices;
+        }
+        return null;
+    }
+
+    /**
+     * Returns all the applications on a device.
+     * @param $device
+     * @return Device
+     */
+    private function getApplications(Device $device)
+    {
+        $stmt = $this->dbc->prepare("SELECT id, apk_name, apk_url, force_install, data_dir, friendly_name FROM application, application_device WHERE application.id = application_device.application_id AND application_device.device_id =:deviceID");
+        $deviceId = $device->getId();
+        $stmt->bindParam(":deviceID", $deviceId);
+        $stmt->execute();
+        $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.sql_setting, sql_setting.sql_location FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
+        $xmlSettingStmt = $this->dbc->prepare("SELECT xml_setting.file_location, xml_setting.regularexp, xml_setting.replacewith FROM application, xml_setting, application_xml_setting WHERE application.id = application_xml_setting.application_id AND xml_setting.id = application_xml_setting.xml_setting_id AND application.id=:appID");
+        foreach ($applications as $application) {
+            $sqlSettingStmt->bindParam(":appID", $application["id"]);
+            $sqlSettingStmt->execute();
+            $sqlSettings = $sqlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
+            $xmlSettingStmt->bindParam(":appID", $application["id"]);
+            $xmlSettingStmt->execute();
+            $xmlSettings = $xmlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
+            $app = new Application($application["id"], $application["data_dir"], $application["apk_name"], $application["apk_url"], $application["friendly_name"], $application["force_install"]);
+            foreach ($sqlSettings as $sqlSetting) {
+                $app->addSQL_setting(new SqlSetting($sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
+            }
+            foreach ($xmlSettings as $xmlSetting) {
+                $app->addXML_setting(new XmlSetting($xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
+            }
+
+            $device->addApplication($app);
+        }
+        return $device;
+    }
+
+    /**
+     * @param $userId
+     * @return Groups[]
+     */
+    private function getGroups($userId)
+    {
+        $stmt = $this->dbc->prepare("SELECT id, prio, name FROM `group`, user_group WHERE `group`.`id` = user_group.group_id AND user_group.user_id=:userId");
+        $stmt->bindParam(":userId", $userId);
+        $stmt->execute();
+        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if(isset($stmtAnswer[0]))
+        {
+            for($i = 0; $i < count($stmtAnswer); $i++)
+            {
+                $groups[$i] = new Group($stmtAnswer[$i]["id"], $stmtAnswer[$i]["prio"], $stmtAnswer[$i]["name"]);
+            }
+            return $groups;
         }
         return null;
     }

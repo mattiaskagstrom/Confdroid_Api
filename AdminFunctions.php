@@ -81,9 +81,9 @@ class AdminFunctions
     {
         $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE '%$name%' AND mail LIKE '%$mail%'");
         $stmt->execute();
-        $querriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $i = 0;
-        foreach ($querriedUsers as $user)
+        foreach ($queriedUsers as $user)
         {
             $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
             $users[$i]->addDevices($this->getDevices($user["id"]));
@@ -113,5 +113,3 @@ class AdminFunctions
         return null;
     }
 }
-
-

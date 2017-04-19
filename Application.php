@@ -1,15 +1,11 @@
 <?php
 
 /**
- * Created by IntelliJ IDEA.
- * User: Mattias Kågström
- * Date: 2017-04-04
- * Time: 11:20
+ * Class Application
+ * Stores data about the applications
  */
 class Application
 {
-
-
     private $id, $forceInstall, $dataDir, $apkName,$apkURL,$name,$SQL_settings = array(),$XML_settings = array();
 
     function __construct($id, $dataDir,$apkName,$apkURL,$name,$forceInstall)
@@ -22,8 +18,6 @@ class Application
         $this->name = $name;
     }
 
-
-
     public function getObject(){
         $application['name'] = $this->name;
         $application['apkName'] = $this->apkName;
@@ -34,8 +28,6 @@ class Application
         $application['XML_settings'] = $this->XML_settings;
         return $application;
     }
-
-
 
     public function addSQL_setting($SQL_setting){
         array_push($this->SQL_settings,$SQL_setting->getObject());
@@ -109,12 +101,4 @@ class Application
     {
         return $this->name;
     }
-
-
-
-
-
-
-
-
 }

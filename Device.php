@@ -9,12 +9,13 @@
 class Device
 {
 
-    private $id, $name, $imei, $applications = array();
+    private $id, $name, $imei, $applications = array(), $dateCreated;
 
-    function __construct($id, $name, $imei){
+    function __construct($id, $name, $imei, $dateCreated){
         $this->id = $id;
         $this->name = $name;
         $this->imei = $imei;
+        $this->dateCreated = $dateCreated;
     }
 
     function __sleep()
@@ -33,6 +34,7 @@ class Device
         $device["name"] = $this->name;
         $device["imei"] = $this->imei;
         $device["applications"] = $this->applications;
+        $device["dateCreated"] = $this->dateCreated;
         return $device;
     }
 

@@ -23,6 +23,7 @@ class Application
     }
 
 
+
     public function getObject(){
         $application['name'] = $this->name;
         $application['apkName'] = $this->apkName;

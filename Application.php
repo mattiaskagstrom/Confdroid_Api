@@ -42,7 +42,7 @@ class Application
     }
 
     public function addXML_setting($XML_setting){
-        array_push($this->XML_settings,$XML_setting);
+        array_push($this->XML_settings,$XML_setting->getObject());
 
     }
 

@@ -12,8 +12,6 @@ class AdminFunctions
     function __construct($dbc)
     {
         $this->dbc = $dbc;
-
-
     }
 
     /**
@@ -71,36 +69,48 @@ class AdminFunctions
         }
         else
             return false;
-//        $stmt = $this->dbc->prepare("SELECT authToken FROM admin WHERE id=:id AND authToken=:authToken");
-//        $stmt->bindParam(":id", $adminId);
-//        $stmt->bindParam(":authToken", $authToken);
-//        $stmt->execute();
-//
-//        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
-//        $retValue["auth"] = null;
-//        if($stmtAnswer[0]["authToken"] == null)
-//        {
-//            $retValue["auth"] = false;
-//            return $retValue;
-//        }
-//        $retValue["auth"] = true;
-//
-//        $_SESSION[""];
-//        return $retValue;
     }
 
     /**
+     * Search on user
      * @param string $name
      * @param string $mail
-     * @return User
+     * @return Mixed
      */
-    private function getUser($name = "", $mail = "")
+    public function searchUsers($name = "", $mail = "")
     {
-        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE :name AND mail LIKE :mail");
-        $stmt->bindParam(":name", $name);
-        $stmt->bindParam(":mail", $mail);
+        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE '%$name%' AND mail LIKE '%$mail%'");
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
+        $querriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $i = 0;
+        foreach ($querriedUsers as $user)
+        {
+            $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
+            $users[$i]->addDevices($this->getDevices($user["id"]));
+            $users[$i] = $users[$i]->getObject();
+            $i++;
+        }
+        return $users;
+    }
+
+    /**
+     * Returns array with devices
+     * @param $userId
+     * @return Devices[]
+     */
+    private function getDevices($userId)
+    {
+        $stmt = $this->dbc->prepare("SELECT id, name, imei, date_created FROM device, user_device WHERE device.id = user_device.device_id AND user_device.user_id=:userId");
+        $stmt->bindParam(":userId", $userId);
+        $stmt->execute();
+        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if(isset($stmtAnswer[0]))
+        {
+            for($i = 0; $i < count($stmtAnswer); $i++)
+                $devices[$i] = new Device($stmtAnswer[$i]["id"], $stmtAnswer[$i]["name"], $stmtAnswer[$i]["imei"], $stmtAnswer[$i]["date_created"]);
+            return $devices;
+        }
+        return null;
     }
 }
 

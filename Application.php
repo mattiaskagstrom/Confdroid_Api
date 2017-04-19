@@ -23,8 +23,9 @@ class Application
     }
 
 
-    function getObject(){
-        $application['friendly_name'] = $this->name;
+
+    public function getObject(){
+        $application['name'] = $this->name;
         $application['apkName'] = $this->apkName;
         $application['forceInstall'] = $this->forceInstall;
         $application['dataDir'] = $this->dataDir;
@@ -34,13 +35,15 @@ class Application
         return $application;
     }
 
-    function addSQL_setting($SQL_setting){
-        array_push($this->SQL_settings,$SQL_setting);
+
+
+    public function addSQL_setting($SQL_setting){
+        array_push($this->SQL_settings,$SQL_setting->getObject());
 
     }
 
-    function addXML_setting($XML_setting){
-        array_push($this->XML_settings,$XML_setting);
+    public function addXML_setting($XML_setting){
+        array_push($this->XML_settings,$XML_setting->getObject());
 
     }
 

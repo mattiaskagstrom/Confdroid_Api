@@ -66,7 +66,11 @@ class DatabaseConnection
             else if($request[2] == "authorize")
                 return $this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]);
             else if($request[2] == "search")
-                return 1;
+            {
+                $users = $this->adminFunctions->searchUsers("a","");
+                return $users;
+            }
+
 
         }
         else{

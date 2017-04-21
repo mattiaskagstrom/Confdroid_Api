@@ -49,8 +49,12 @@ class DatabaseConnection
                     return "No device on this imei, contact administration for support";
                 $device = $this->getApplications($device);                 //Gets the device applications
             }
-            $user->addDevice($device);                                                      //Add device to the user
-            return $user->getObject();
+            if(isset($device)) {
+                $user->addDevice($device);                                                      //Add device to the user
+                return $user->getObject();
+            }
+            else
+                return "No device found";
 
         } else {
             return "No such unit to get";

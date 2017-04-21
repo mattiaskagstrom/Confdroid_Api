@@ -79,7 +79,7 @@ class AdminFunctions
      */
     public function searchUsers($name = "", $mail = "")
     {
-        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE '%$name%' AND mail LIKE '%$mail%'");
+        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE '%$name%' OR mail LIKE '%$mail%'");
         $stmt->execute();
         $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $i = 0;

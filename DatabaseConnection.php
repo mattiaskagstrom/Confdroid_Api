@@ -1,10 +1,7 @@
 <?php
 
 /**
- * Created by IntelliJ IDEA.
- * User: Mattias Kågström
- * Date: 2017-04-04
- * Time: 11:18
+ * Connection between database and API.
  */
 spl_autoload_register(function ($class_name) {
     include $class_name . '.php';
@@ -14,6 +11,8 @@ spl_autoload_register(function ($class_name) {
 class DatabaseConnection
 {
     private $dbc;
+    private $applicationFunctions;
+    private $adminFunctions;
 
     /**
      * DatabaseConnection constructor.
@@ -27,88 +26,73 @@ class DatabaseConnection
             PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
         );
         $this->dbc = new PDO($dsn, $username, $password, $options);
-
-
-
+        $this->applicationFunctions = new ApplicationFunctions($this->dbc);
+        $this->adminFunctions = new AdminFunctions($this->dbc);
     }
-
-    public function login($username, $password){
-
-    }
-
 
     /**
      * Split the get request into the data fetching functions for each unit
      * @param $request to handle
      * @return mixed|string, returns md array with the requested object, or a string if nothing is found
      */
-    public function get($request){
-        if($request[1] == "user" && !isset($request[2])){
-            if(isset($_GET["imei"])){
-                return $this->getUser($_GET["userAuth"], $_GET["imei"]);
-            }else{
-                return $this->getUser($_GET["userAuth"]);
+    public function get($request)
+    {
+        if ($request[1] == "user" && !isset($request[2])) {
+            if (!isset($_GET["userAuth"])) {
+                die("userAuth token missing.");
             }
-        }else{
+            if (isset($_GET["imei"])) {
+                $userValues = $this->applicationFunctions->authorizeUser($_GET["userAuth"]);    //Gets User
+                $user = new User($userValues["id"], $userValues["name"], $userValues["mail"]);  //Create User from authorized user
+                $device = $this->applicationFunctions->getDevice($user->getId(), $_GET["imei"]);//Gets Device
+                if ($device == null)
+                    return "No device on this imei, contact administration for support";
+                $device = $this->getApplications($device);                 //Gets the device applications
+            }
+            if(isset($device)) {
+                $user->addDevice($device);                                                      //Add device to the user
+                return $user->getObject();
+            }
+            else
+                return "No device found";
+
+        } else {
             return "No such unit to get";
         }
     }
 
-    public function post($request){
-
-    }
-
-    public function put($request){
-
-    }
-
-    public function delete($request){
-
-    }
-
-    private function sqlQuery(){
-        //SELECT user.name, device.name FROM device, user, user_device WHERE user_device.user_id = user.id AND user_device.device_id = device.id
-    }
-
-    /**
-     * @param $userAuth, the authentication token for the user to get
-     * @param $imei is optional, fetches all if not specified.
-     * @return md array with the requested user and its device(es).
-     */
-    private function getUser($userAuth, $imei = null){
-        $stmt = $this->dbc->prepare("SELECT id, name, mail FROM user WHERE auth_token=:authToken");
-        $stmt->bindParam(":authToken", $userAuth);
-        $stmt->execute();
-        $dbuser = $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
-
-        if($imei != null){
-            $stmt = $this->dbc->prepare("SELECT id, name, imei FROM device, user_device WHERE device.id = user_device.device_id AND user_device.user_id = :userID AND device.imei = :imei");
-            $stmt->bindParam(":userID", $dbuser["id"]);
-            $stmt->bindParam("imei", $imei);
-        }else{
-            $stmt = $this->dbc->prepare("SELECT id, name, imei FROM device, user_device WHERE device.id = user_device.device_id AND user_device.user_id = :userID");
-            $stmt->bindParam(":userID", $dbuser["id"]);
-        }
-        $stmt->execute();
-        $devices = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $user = new User($dbuser["id"], $dbuser["name"], $dbuser["mail"]);
-
-        $stmt = $this->dbc->prepare("SELECT id, apk_name, apk_url, force_install, data_dir, friendly_name FROM application, application_device WHERE application.id = application_device.application_id AND application_device.device_id =:deviceID");
-        foreach ($devices as $device) {
-            $newDevice = new Device($device["id"], $device["name"], $device["imei"]);
-            $deviceID = $newDevice->getId();
-            $stmt->bindParam(":deviceID", $deviceID);
-            $stmt->execute();
-
-            $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($applications as $application) {
-                $newDevice->addApplication(new Application($application["id"], $application["data_dir"], $application["apk_name"],$application["apk_url"],$application["friendly_name"],$application["force_install"]));
+    public function post($request)
+    {
+        if ($request[1] == "admin") {
+            if ($request[2] == "login")
+                return $this->adminFunctions->login($_POST["username"], $_POST["password"]);
+            else if ($request[2] == "authorize")
+                return $this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]);
+            else if ($request[2] == "search") {
+                if($this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]))
+                    $users = $this->adminFunctions->searchUsers($_POST["searchValue"], $_POST["searchValue"]);
+                else
+                    $users[0] = "Not Authorized";
+                return $users;
             }
-            $user->addDevice($newDevice);
 
+        } else {
+            return "No such unit to get";
         }
+    }
 
-        return $user->getObject();
+    public function put($request)
+    {
+
+    }
+
+    public function delete($request)
+    {
+
+    }
+
+    private function sqlQuery()
+    {
+        //SELECT user.name, device.name FROM device, user, user_device WHERE user_device.user_id = user.id AND user_device.device_id = device.id
     }
 }

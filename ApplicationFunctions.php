@@ -57,7 +57,7 @@ class ApplicationFunctions
      * @param $device
      * @return Device
      */
-    private function getApplications(Device $device)
+    public function getApplications(Device $device)
     {
         $stmt = $this->dbc->prepare("SELECT id, apk_name, apk_url, force_install, data_dir, friendly_name FROM application, application_device WHERE application.id = application_device.application_id AND application_device.device_id =:deviceID");
         $deviceId = $device->getId();

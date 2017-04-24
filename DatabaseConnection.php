@@ -45,17 +45,18 @@ class DatabaseConnection
                 $userValues = $this->applicationFunctions->authorizeUser($_GET["userAuth"]);    //Gets User
                 $user = new User($userValues["id"], $userValues["name"], $userValues["mail"]);  //Create User from authorized user
                 $device = $this->applicationFunctions->getDevice($user->getId(), $_GET["imei"]);//Gets Device
-                if ($device == null)
+                if ($device == null){
                     return "No device on this imei, contact administration for support";
-                $device = $this->getApplications($device);                 //Gets the device applications
+                }
+                $device = $this->applicationFunctions->getApplications($device);                 //Gets the device applications
             }
             if(isset($device)) {
                 $user->addDevice($device);                                                      //Add device to the user
                 return $user->getObject();
             }
-            else
+            else{
                 return "No device found";
-
+            }
         } else {
             return "No such unit to get";
         }

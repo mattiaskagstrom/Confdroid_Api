@@ -79,21 +79,28 @@ class AdminFunctions
      */
     public function searchUsers($name = "", $mail = "")
     {
-        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE '%$name%' AND mail LIKE '%$mail%'");
+        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE '%$name%' OR mail LIKE '%$mail%'");
         $stmt->execute();
         $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $i = 0;
         if(isset($queriedUsers[0])) {
-            foreach ($queriedUsers as $user) {
-                $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
-                $users[$i]->addDevices($this->getDevices($user["id"]));
-                $users[$i]->addGroups($this->getGroups($user["id"]));
-                $users[$i] = $users[$i]->getObject();
-                $i++;
-            }
+            $users = $this->createUsersFromSqlAnswer($queriedUsers);
             return $users;
         }
         $users[0] = "Failed";
+        return $users;
+    }
+
+    private function createUsersFromSqlAnswer($stmtAnswer)
+    {
+        $i = 0;
+        foreach ($stmtAnswer as $user) {
+            $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
+            $users[$i]->addDevices($this->getDevices($user["id"]));
+            $users[$i]->addGroups($this->getGroupsByUserId($user["id"]));
+            $users[$i] = $users[$i]->getObject();
+            $i++;
+        }
         return $users;
     }
 
@@ -158,7 +165,7 @@ class AdminFunctions
      * @param $userId
      * @return Groups[]
      */
-    private function getGroups($userId)
+    private function getGroupsByUserId($userId)
     {
         $stmt = $this->dbc->prepare("SELECT id, prio, name FROM `group`, user_group WHERE `group`.`id` = user_group.group_id AND user_group.user_id=:userId");
         $stmt->bindParam(":userId", $userId);
@@ -173,5 +180,55 @@ class AdminFunctions
             return $groups;
         }
         return null;
+    }
+
+//    public function searchGroups($groupName)
+//    {
+//        $stmt = $this->dbc->prepare("SELECT id, prio, name FROM `group` WHERE name LIKE '%$groupName%'");
+//        $stmt->execute();
+//        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+//        if(isset($stmtAnswer[0]))
+//        {
+//            for($i = 0; $i < count($stmtAnswer); $i++)
+//            {
+//                $groupIds[$i] = $stmtAnswer[$i]["id"];
+//            }
+//            $users = $this->getUsersFromGroups($groupIds);
+//            return $users;
+//        }
+//        $users[0] = "Failed";
+//        return $users;
+//    }
+
+    public function searchGroups($groupName)
+    {
+        $stmt = $this->dbc->prepare("SELECT id, prio, name FROM `group` WHERE name LIKE '%$groupName%'");
+        $stmt->execute();
+        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if(isset($stmtAnswer[0]))
+        {
+            for($i = 0; $i < count($stmtAnswer); $i++)
+            {
+                $groups[$i] = new Group($stmtAnswer[$i]["id"], $stmtAnswer[$i]["prio"], $stmtAnswer[$i]["name"]);
+                $groups[$i] = $groups[$i]->getObject();
+            }
+            return  $groups;
+        }
+        $users[0] = "Failed";
+        return $users;
+    }
+
+    private function getUsersFromGroups($groupIds)
+    {
+        $users = array();
+        foreach ($groupIds as $groupId)
+        {
+            $stmt = $this->dbc->prepare("SELECT id, name, mail, auth_token, date_created FROM `user`, user_group WHERE `user`.`id` = user_group.user_id AND user_group.group_id=:groupId");
+            $stmt->bindParam(":groupId", $groupId);
+            $stmt->execute();
+            $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $users = array_merge($users, $this->createUsersFromSqlAnswer($stmtAnswer));
+        }
+        return $users;
     }
 }

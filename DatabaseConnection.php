@@ -59,14 +59,21 @@ class DatabaseConnection
 
     public function post($request)
     {
-        if ($request[1] == "admin") {
+        if ($request[1] == "admin")
+        {
             if ($request[2] == "login")
                 return $this->adminFunctions->login($_POST["username"], $_POST["password"]);
             else if ($request[2] == "authorize")
                 return $this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]);
-            else if ($request[2] == "search") {
+            else if ($request[2] == "search")
+            {
                 if($this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]))
-                    $users = $this->adminFunctions->searchUsers($_POST["searchValue"], $_POST["searchValue"]);
+                {
+                    if($_POST["searchType"] == "User")
+                        $users = $this->adminFunctions->searchUsers($_POST["searchValue"], $_POST["searchValue"]);
+                    else
+                        $users = $this->adminFunctions->searchGroups($_POST["searchValue"]);
+                }
                 else
                     $users[0] = "Not Authorized";
                 return $users;

@@ -8,15 +8,7 @@
  */
 class AdminFunctions
 {
-    /**
-     * @var PDO
-     */
     private $dbc;
-
-    /**
-     * AdminFunctions constructor.
-     * @param $dbc PDO
-     */
     function __construct($dbc)
     {
         $this->dbc = $dbc;
@@ -54,6 +46,8 @@ class AdminFunctions
             $insertAuth->bindParam(":password", $password);
             $insertAuth->execute();
             $adminSession["Token"] = $token;
+            $_SESSION["authToken"] = $token;                                    //Starts session variables used in authorzation
+            $_SESSION["adminId"] = $user[0]["id"];
             return $adminSession;
         }
     }
@@ -66,13 +60,15 @@ class AdminFunctions
      */
     public function authorizeAdmin($authToken, $adminId)
     {
-        $stmt = $this->dbc->prepare("SELECT * FROM admin WHERE id=:adminID AND authToken=:authToken");
-        $stmt->bindParam(":adminID", $adminId);
-        $stmt->bindParam(":authToken", $authToken);
-        $stmt->execute();
-        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if(sizeof($result) == 1)return true;
-        return false;
+        if(isset($_SESSION["authToken"]) && isset($_SESSION["adminId"]))
+        {
+            if($_SESSION["authToken"] == $authToken && $_SESSION["adminId"] == $adminId)
+                return true;
+            else
+                return false;
+        }
+        else
+            return false;
     }
 
     /**
@@ -88,16 +84,23 @@ class AdminFunctions
         $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $i = 0;
         if(isset($queriedUsers[0])) {
-            foreach ($queriedUsers as $user) {
-                $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
-                $users[$i]->addDevices($this->getDevices($user["id"]));
-                $users[$i]->addGroups($this->getGroups($user["id"]));
-                $users[$i] = $users[$i]->getObject();
-                $i++;
-            }
+            $users = $this->createUsersFromSqlAnswer($queriedUsers);
             return $users;
         }
         $users[0] = "Failed";
+        return $users;
+    }
+
+    private function createUsersFromSqlAnswer($stmtAnswer)
+    {
+        $i = 0;
+        foreach ($stmtAnswer as $user) {
+            $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
+            $users[$i]->addDevices($this->getDevices($user["id"]));
+            $users[$i]->addGroups($this->getGroupsByUserId($user["id"]));
+            $users[$i] = $users[$i]->getObject();
+            $i++;
+        }
         return $users;
     }
 
@@ -162,7 +165,7 @@ class AdminFunctions
      * @param $userId
      * @return Groups[]
      */
-    private function getGroups($userId)
+    private function getGroupsByUserId($userId)
     {
         $stmt = $this->dbc->prepare("SELECT id, prio, name FROM `group`, user_group WHERE `group`.`id` = user_group.group_id AND user_group.user_id=:userId");
         $stmt->bindParam(":userId", $userId);
@@ -206,5 +209,37 @@ class AdminFunctions
             return false;
         }
         $stmt->execute();
+    }
+
+    public function searchGroups($groupName)
+    {
+        $stmt = $this->dbc->prepare("SELECT id, prio, name FROM `group` WHERE name LIKE '%$groupName%'");
+        $stmt->execute();
+        $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if(isset($stmtAnswer[0]))
+        {
+            for($i = 0; $i < count($stmtAnswer); $i++)
+            {
+                $groups[$i] = new Group($stmtAnswer[$i]["id"], $stmtAnswer[$i]["prio"], $stmtAnswer[$i]["name"]);
+                $groups[$i] = $groups[$i]->getObject();
+            }
+            return  $groups;
+        }
+        $users[0] = "Failed";
+        return $users;
+    }
+
+    private function getUsersFromGroups($groupIds)
+    {
+        $users = array();
+        foreach ($groupIds as $groupId)
+        {
+            $stmt = $this->dbc->prepare("SELECT id, name, mail, auth_token, date_created FROM `user`, user_group WHERE `user`.`id` = user_group.user_id AND user_group.group_id=:groupId");
+            $stmt->bindParam(":groupId", $groupId);
+            $stmt->execute();
+            $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $users = array_merge($users, $this->createUsersFromSqlAnswer($stmtAnswer));
+        }
+        return $users;
     }
 }

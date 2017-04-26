@@ -80,7 +80,6 @@ class DatabaseConnection
                     }
                 }
         }
-
     }
 
     public function post($request)
@@ -111,9 +110,7 @@ class DatabaseConnection
                 http_response_code(404);
                 return "No such unit to get";
         }
-
     }
-
 
     public function put($request)
     {

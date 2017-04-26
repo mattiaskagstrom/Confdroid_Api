@@ -8,7 +8,11 @@
  */
 class AdminFunctions
 {
+    /**
+     * @var PDO
+     */
     private $dbc;
+
     function __construct($dbc)
     {
         $this->dbc = $dbc;
@@ -35,9 +39,7 @@ class AdminFunctions
         {
             $adminSession["Token"] = "Failed";
             return $adminSession;
-        }
-        else
-        {
+        } else {
             $adminSession["id"] = $user[0]["id"];
             $token = bin2hex(openssl_random_pseudo_bytes(16));          //Creates random hex Token
             $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken WHERE username=:username AND password=:password ");
@@ -46,8 +48,6 @@ class AdminFunctions
             $insertAuth->bindParam(":password", $password);
             $insertAuth->execute();
             $adminSession["Token"] = $token;
-            $_SESSION["authToken"] = $token;                                    //Starts session variables used in authorzation
-            $_SESSION["adminId"] = $user[0]["id"];
             return $adminSession;
         }
     }
@@ -60,15 +60,13 @@ class AdminFunctions
      */
     public function authorizeAdmin($authToken, $adminId)
     {
-        if(isset($_SESSION["authToken"]) && isset($_SESSION["adminId"]))
-        {
-            if($_SESSION["authToken"] == $authToken && $_SESSION["adminId"] == $adminId)
-                return true;
-            else
-                return false;
-        }
-        else
-            return false;
+        $stmt = $this->dbc->prepare("SELECT * FROM admin WHERE id=:adminID AND authToken=:authToken");
+        $stmt->bindParam(":adminID", $adminId);
+        $stmt->bindParam(":authToken", $authToken);
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if (sizeof($result) == 1) return true;
+        return false;
     }
 
     /**
@@ -83,7 +81,7 @@ class AdminFunctions
         $stmt->execute();
         $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $i = 0;
-        if(isset($queriedUsers[0])) {
+        if (isset($queriedUsers[0])) {
             $users = $this->createUsersFromSqlAnswer($queriedUsers);
             return $users;
         }
@@ -94,6 +92,7 @@ class AdminFunctions
     private function createUsersFromSqlAnswer($stmtAnswer)
     {
         $i = 0;
+        $users = array(User::class);
         foreach ($stmtAnswer as $user) {
             $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
             $users[$i]->addDevices($this->getDevices($user["id"]));
@@ -107,7 +106,7 @@ class AdminFunctions
     /**
      * Returns array with devices
      * @param $userId
-     * @return Devices
+     * @return Device
      */
     private function getDevices($userId)
     {
@@ -115,10 +114,9 @@ class AdminFunctions
         $stmt->bindParam(":userId", $userId);
         $stmt->execute();
         $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if(isset($stmtAnswer[0]))
-        {
-            for($i = 0; $i < count($stmtAnswer); $i++)
-            {
+        if (isset($stmtAnswer[0])) {
+            $devices = null;
+            for ($i = 0; $i < count($stmtAnswer); $i++) {
                 $devices[$i] = new Device($stmtAnswer[$i]["id"], $stmtAnswer[$i]["name"], $stmtAnswer[$i]["imei"], $stmtAnswer[$i]["date_created"]);
                 $devices[$i] = $this->getApplications($devices[$i]);
             }
@@ -171,10 +169,8 @@ class AdminFunctions
         $stmt->bindParam(":userId", $userId);
         $stmt->execute();
         $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if(isset($stmtAnswer[0]))
-        {
-            for($i = 0; $i < count($stmtAnswer); $i++)
-            {
+        if (isset($stmtAnswer[0])) {
+            for ($i = 0; $i < count($stmtAnswer); $i++) {
                 $groups[$i] = new Group($stmtAnswer[$i]["id"], $stmtAnswer[$i]["prio"], $stmtAnswer[$i]["name"]);
             }
             return $groups;
@@ -182,7 +178,8 @@ class AdminFunctions
         return null;
     }
 
-    public function addUser($name, $email){
+    public function addUser($name, $email)
+    {
         $token = bin2hex(openssl_random_pseudo_bytes(16));          //Creates random hex Token
         $stmt = $this->dbc->prepare("INSERT INTO user(name, mail, auth_token) VALUES(:name, :mail, :authToken)");
         $stmt->bindParam(":name", $name);
@@ -192,20 +189,21 @@ class AdminFunctions
         return true;
     }
 
-    public function removeUser($id = null, $token = null){
-        if(isset($id) && isset($token)){
+    public function removeUser($id = null, $token = null)
+    {
+        if (isset($id) && isset($token)) {
             $stmt = $this->dbc->prepare("DELETE FROM user WHERE id=:id AND auth_token=:token;");
             $stmt->bindParam(":id", $id);
             $stmt->bindParam(":token", $token);
-        }else if(isset($id)){
+        } else if (isset($id)) {
             $stmt = $this->dbc->prepare("DELETE FROM user WHERE id=:id;");
             $stmt->bindParam(":id", $id);
 
-        }else if(isset($token)){
+        } else if (isset($token)) {
             $stmt = $this->dbc->prepare("DELETE FROM user WHERE auth_token=:token;");
             $stmt->bindParam(":id", $id);
 
-        }else{
+        } else {
             return false;
         }
         $stmt->execute();
@@ -216,30 +214,15 @@ class AdminFunctions
         $stmt = $this->dbc->prepare("SELECT id, prio, name FROM `group` WHERE name LIKE '%$groupName%'");
         $stmt->execute();
         $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if(isset($stmtAnswer[0]))
-        {
-            for($i = 0; $i < count($stmtAnswer); $i++)
-            {
+        if (isset($stmtAnswer[0])) {
+            $groups = null;
+            for ($i = 0; $i < count($stmtAnswer); $i++) {
                 $groups[$i] = new Group($stmtAnswer[$i]["id"], $stmtAnswer[$i]["prio"], $stmtAnswer[$i]["name"]);
                 $groups[$i] = $groups[$i]->getObject();
             }
-            return  $groups;
+            return $groups;
         }
         $users[0] = "Failed";
-        return $users;
-    }
-
-    private function getUsersFromGroups($groupIds)
-    {
-        $users = array();
-        foreach ($groupIds as $groupId)
-        {
-            $stmt = $this->dbc->prepare("SELECT id, name, mail, auth_token, date_created FROM `user`, user_group WHERE `user`.`id` = user_group.user_id AND user_group.group_id=:groupId");
-            $stmt->bindParam(":groupId", $groupId);
-            $stmt->execute();
-            $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            $users = array_merge($users, $this->createUsersFromSqlAnswer($stmtAnswer));
-        }
         return $users;
     }
 }

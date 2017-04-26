@@ -32,7 +32,7 @@ class DatabaseConnection
 
     /**
      * Split the get request into the data fetching functions for each unit
-     * @param $request to handle
+     * @param $request, the request to handle
      * @return mixed|string, returns md array with the requested object, or a string if nothing is found
      */
     public function get($request)
@@ -41,22 +41,18 @@ class DatabaseConnection
         switch ($request[1]) {
             case "user":
                 if (!isset($request[2])) {
-                    if ($this->adminFunctions->authorizeAdmin($_GET["authToken"], $_GET["id"])) {
-                        $searchValue=null;
-                        if(isset($_GET[searchValue]))$searchValue=$_GET["searchValue"];
-                        $users = $this->adminFunctions->searchUsers($searchValue, $searchValue);
-                        return $users;
-                    }else {
-                        http_response_code(403);
-                        return "Not Authorized";
-                    }
+                    $this->authorizeAdmin();
+                    $searchValue = null;
+                    if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
+                    $users = $this->adminFunctions->searchUsers($searchValue, $searchValue);
+                    return $users;
 
 
                 } else {
 
                     if (isset($_GET["imei"])) {
-                        $userValues = $this->applicationFunctions->authorizeUser($request[2]);    //Gets User
-                        if ($userValues == "not authorized") {
+                        $userValues = $this->applicationFunctions->getUser($request[2]);    //Gets User
+                        if ($userValues == null) {
                             http_response_code(403);
                             die();
                         }
@@ -75,11 +71,20 @@ class DatabaseConnection
                             http_response_code(404);
                             return "No device found";
                         }
-                    }else{
+                    } else {
                         http_response_code(400);
                     }
                 }
+                break;
+            case "group":
+                $this->authorizeAdmin();
+                $searchValue = null;
+                if(isset($_POST["searchValue"]))$searchValue = $_POST["searchValue"];
+                return $this->adminFunctions->searchGroups($searchValue);
+                break;
         }
+        http_response_code(404);
+        return "no such resource";
     }
 
     public function post($request)
@@ -96,48 +101,63 @@ class DatabaseConnection
                 }
                 break;
             case "user":
-                if ($this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"])) {
-                    if ($this->adminFunctions->addUser($_POST["name"], $_POST["email"])) {
-                        http_response_code(201);
+                $this->authorizeAdmin();
+                if ($this->adminFunctions->addUser($_POST["name"], $_POST["email"])) {
+                    http_response_code(201);
 
-                    }
-                } else {
-                    http_response_code(403);
-                    return "Not Authorized";
                 }
+
                 break;
             default:
                 http_response_code(404);
                 return "No such unit to get";
         }
+        http_response_code(404);
+        return "no such resource";
     }
 
     public function put($request)
     {
-
+        $this->authorizeAdmin();
     }
 
     public function delete($request)
     {
-        if ($this - $this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"])) {
-            switch ($request[1]) {
-                case "user":
-                    if (isset($request[2])) {
-                        if(!$this->$this->adminFunctions->removeUser(null, $request[2]))http_response_code(400);
-                    }else{
-                        http_response_code(400);
-                    }
+        $this->authorizeAdmin();
+        switch ($request[1]) {
+            case "user":
+                if (isset($request[2])) {
+                    if (!$this->$this->adminFunctions->removeUser(null, $request[2])) http_response_code(400);
+                } else {
+                    http_response_code(400);
+                }
 
-                    break;
-            }
-        } else {
-            http_response_code(403);
-            return "Not Authorized";
+                break;
         }
+
     }
 
-    private function sqlQuery()
+    private function authorizeAdmin()
     {
-        //SELECT user.name, device.name FROM device, user, user_device WHERE user_device.user_id = user.id AND user_device.device_id = device.id
+        $authToken = null;
+        $id = null;
+        if (isset($_POST["authToken"]) && isset($_POST["id"])) {
+            $authToken = $_POST["authToken"];
+            $id = $_POST["id"];
+        } else if (isset($_GET["authToken"]) && isset($_GET["id"])) {
+            $authToken = $_GET["authToken"];
+            $id = $_GET["id"];
+        } else {
+            echo "missing credentials";
+            http_response_code(400);
+            die();
+        }
+        if ($this->adminFunctions->authorizeAdmin($authToken, $id)) {
+            return true;
+        } else {
+            echo "Invalid credentials";
+            http_response_code(403);
+            die();
+        }
     }
 }

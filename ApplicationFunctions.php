@@ -25,17 +25,13 @@ class ApplicationFunctions
      * @param $userAuth
      * @return User
      */
-    public function authorizeUser($userAuth)
+    public function getUser($userAuth)
     {
         $stmt = $this->dbc->prepare("SELECT id, name, mail FROM user WHERE auth_token=:authToken");
         $stmt->bindParam(":authToken", $userAuth);
         $stmt->execute();
         $array = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if(!isset($array[0])){
-            return "not authorized";
-        }else{
-            return $array[0];
-        }
+        return $array;
 
     }
 

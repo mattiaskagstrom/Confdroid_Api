@@ -37,50 +37,83 @@ class DatabaseConnection
      */
     public function get($request)
     {
-        if ($request[1] == "user" && !isset($request[2])) {
-            if (!isset($_GET["userAuth"])) {
-                die("userAuth token missing.");
-            }
-            if (isset($_GET["imei"])) {
-                $userValues = $this->applicationFunctions->authorizeUser($_GET["userAuth"]);    //Gets User
-                $user = new User($userValues["id"], $userValues["name"], $userValues["mail"]);  //Create User from authorized user
-                $device = $this->applicationFunctions->getDevice($user->getId(), $_GET["imei"]);//Gets Device
-                if ($device == null){
-                    return "No device on this imei, contact administration for support";
+
+        switch ($request[1]) {
+            case "user":
+                if (!isset($request[2])) {
+                    if ($this->adminFunctions->authorizeAdmin($_GET["authToken"], $_GET["id"])) {
+                        $searchValue=null;
+                        if(isset($_GET[searchValue]))$searchValue=$_GET["searchValue"];
+                        $users = $this->adminFunctions->searchUsers($searchValue, $searchValue);
+                        return $users;
+                    }else {
+                        http_response_code(403);
+                        return "Not Authorized";
+                    }
+
+
+                } else {
+
+                    if (isset($_GET["imei"])) {
+                        $userValues = $this->applicationFunctions->authorizeUser($request[2]);    //Gets User
+                        if ($userValues == "not authorized") {
+                            http_response_code(403);
+                            die();
+                        }
+                        $user = new User($userValues["id"], $userValues["name"], $userValues["mail"]);  //Create User from authorized user
+                        $device = $this->applicationFunctions->getDevice($user->getId(), $_GET["imei"]);//Gets Device
+                        if ($device == null) {
+                            http_response_code(404);
+                            return "No device on this imei, contact administration for support";
+                        }
+                        $device = $this->applicationFunctions->getApplications($device);                 //Gets the device applications
+
+                        if (isset($device) && isset($user)) {
+                            $user->addDevice($device);                                                      //Add device to the user
+                            return $user->getObject();
+                        } else {
+                            http_response_code(404);
+                            return "No device found";
+                        }
+                    }else{
+                        http_response_code(400);
+                    }
                 }
-                $device = $this->applicationFunctions->getApplications($device);                 //Gets the device applications
-            }
-            if(isset($device)) {
-                $user->addDevice($device);                                                      //Add device to the user
-                return $user->getObject();
-            }
-            else{
-                return "No device found";
-            }
-        } else {
-            return "No such unit to get";
         }
+
     }
 
     public function post($request)
     {
-        if ($request[1] == "admin") {
-            if ($request[2] == "login")
-                return $this->adminFunctions->login($_POST["username"], $_POST["password"]);
-            else if ($request[2] == "authorize")
-                return $this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]);
-            else if ($request[2] == "search") {
-                if($this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"]))
-                    $users = $this->adminFunctions->searchUsers($_POST["searchValue"], $_POST["searchValue"]);
-                else
-                    $users[0] = "Not Authorized";
-                return $users;
-            }
+        switch ($request[1]) {
+            case "admin":
+                switch ($request[2]) {
+                    case "login":
+                        return $this->adminFunctions->login($_POST["username"], $_POST["password"]);
+                        break;
+                    default:
+                        http_response_code(404);
+                        return "No such unit to get";
+                }
+                break;
+            case "user":
+                if ($this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"])) {
+                    if ($this->adminFunctions->addUser($_POST["name"], $_POST["email"])) {
+                        http_response_code(201);
 
-        } else {
-            return "No such unit to get";
+                    }
+                } else {
+                    http_response_code(403);
+                    return "Not Authorized";
+                }
+                break;
+            default:
+                http_response_code(404);
+                return "No such unit to get";
         }
+
     }
+
 
     public function put($request)
     {
@@ -89,7 +122,21 @@ class DatabaseConnection
 
     public function delete($request)
     {
+        if ($this - $this->adminFunctions->authorizeAdmin($_POST["authToken"], $_POST["id"])) {
+            switch ($request[1]) {
+                case "user":
+                    if (isset($request[2])) {
+                        if(!$this->$this->adminFunctions->removeUser(null, $request[2]))http_response_code(400);
+                    }else{
+                        http_response_code(400);
+                    }
 
+                    break;
+            }
+        } else {
+            http_response_code(403);
+            return "Not Authorized";
+        }
     }
 
     private function sqlQuery()

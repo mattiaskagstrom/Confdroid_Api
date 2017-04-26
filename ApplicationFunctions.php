@@ -30,7 +30,13 @@ class ApplicationFunctions
         $stmt = $this->dbc->prepare("SELECT id, name, mail FROM user WHERE auth_token=:authToken");
         $stmt->bindParam(":authToken", $userAuth);
         $stmt->execute();
-        return $stmt->fetchAll(PDO::FETCH_ASSOC)[0];
+        $array = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if(!isset($array[0])){
+            return "not authorized";
+        }else{
+            return $array[0];
+        }
+
     }
 
     /**

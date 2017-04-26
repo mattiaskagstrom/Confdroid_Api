@@ -8,7 +8,15 @@
  */
 class AdminFunctions
 {
+    /**
+     * @var PDO
+     */
     private $dbc;
+
+    /**
+     * AdminFunctions constructor.
+     * @param $dbc PDO
+     */
     function __construct($dbc)
     {
         $this->dbc = $dbc;
@@ -46,8 +54,6 @@ class AdminFunctions
             $insertAuth->bindParam(":password", $password);
             $insertAuth->execute();
             $adminSession["Token"] = $token;
-            $_SESSION["authToken"] = $token;                                    //Starts session variables used in authorzation
-            $_SESSION["adminId"] = $user[0]["id"];
             return $adminSession;
         }
     }
@@ -60,15 +66,13 @@ class AdminFunctions
      */
     public function authorizeAdmin($authToken, $adminId)
     {
-        if(isset($_SESSION["authToken"]) && isset($_SESSION["adminId"]))
-        {
-            if($_SESSION["authToken"] == $authToken && $_SESSION["adminId"] == $adminId)
-                return true;
-            else
-                return false;
-        }
-        else
-            return false;
+        $stmt = $this->dbc->prepare("SELECT * FROM admin WHERE id=:adminID AND authToken=:authToken");
+        $stmt->bindParam(":adminID", $adminId);
+        $stmt->bindParam(":authToken", $authToken);
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        if(sizeof($result) == 1)return true;
+        return false;
     }
 
     /**
@@ -100,7 +104,7 @@ class AdminFunctions
     /**
      * Returns array with devices
      * @param $userId
-     * @return Devices[]
+     * @return Devices
      */
     private function getDevices($userId)
     {
@@ -173,5 +177,34 @@ class AdminFunctions
             return $groups;
         }
         return null;
+    }
+
+    public function addUser($name, $email){
+        $token = bin2hex(openssl_random_pseudo_bytes(16));          //Creates random hex Token
+        $stmt = $this->dbc->prepare("INSERT INTO user(name, mail, auth_token) VALUES(:name, :mail, :authToken)");
+        $stmt->bindParam(":name", $name);
+        $stmt->bindParam(":mail", $email);
+        $stmt->bindParam(":authToken", $token);
+        $stmt->execute();
+        return true;
+    }
+
+    public function removeUser($id = null, $token = null){
+        if(isset($id) && isset($token)){
+            $stmt = $this->dbc->prepare("DELETE FROM user WHERE id=:id AND auth_token=:token;");
+            $stmt->bindParam(":id", $id);
+            $stmt->bindParam(":token", $token);
+        }else if(isset($id)){
+            $stmt = $this->dbc->prepare("DELETE FROM user WHERE id=:id;");
+            $stmt->bindParam(":id", $id);
+
+        }else if(isset($token)){
+            $stmt = $this->dbc->prepare("DELETE FROM user WHERE auth_token=:token;");
+            $stmt->bindParam(":id", $id);
+
+        }else{
+            return false;
+        }
+        $stmt->execute();
     }
 }

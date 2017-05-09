@@ -31,7 +31,7 @@ class ApplicationFunctions
         $stmt->bindParam(":authToken", $userAuth);
         $stmt->execute();
         $array = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        return $array;
+        return new User($array[0]["id"], $array[0]["name"], $array[0]["mail"]);
 
     }
 

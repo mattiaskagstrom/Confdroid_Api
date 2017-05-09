@@ -12,7 +12,7 @@ spl_autoload_register(function ($class_name) {
 class User
 {
 
-    private $id, $name, $email, $devices = array(), $groups = array(), $authToken, $dateCreated;
+    private $id, $name, $email, $devices = array(), $groups = array(), $authToken, $dateCreated, $applications = array();
 
     function __construct($id, $name, $email, $authToken = null, $dateCreated = null)
     {
@@ -48,7 +48,7 @@ class User
     /**
      * @param $device Device
      */
-    public function addDevice($device){
+    public function addDevice(Device $device){
         array_push($this->devices,$device->getObject());
     }
 
@@ -60,7 +60,7 @@ class User
             $this->addDevice($devices[$i]);
     }
 
-    public function addGroup($group){
+    public function addGroup(Group $group){
         array_push($this->groups, $group->getObject());
     }
 
@@ -70,6 +70,18 @@ class User
     public function addGroups($groups){
         for ($i = 0; $i < count($groups); $i++)
             $this->addGroup($groups[$i]);
+    }
+
+    public function addApplication(Application $application){
+        array_push($this->applications, $application->getObject());
+    }
+
+    /**
+     * @return array
+     */
+    public function getApplications(): array
+    {
+        return $this->applications;
     }
 
     public function getName(){

@@ -13,7 +13,7 @@ spl_autoload_register(function ($class_name) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 //remove the filetype from the string, so we can use it later
-$request = explode(".", $_GET["url"]);
+$request = explode(".", strtolower($_GET["url"]));
 if (sizeof($request) <= 1) {
     die("<br>Please specify a unit to return<br>");
 }
@@ -36,13 +36,14 @@ switch ($method) {
 
         break;
     case 'HEAD':
-        //do_something_with_head($request);
+        http_response_code(501);
         break;
     case 'DELETE':
         $output = $db->delete($request);
         break;
     case 'OPTIONS':
-        //do_something_with_options($request);
+        header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+        //http_response_code(501);
         break;
     default:
         //handle_error($request);
@@ -52,12 +53,14 @@ switch ($method) {
 if($output != null) {
     switch ($fileType) {
         case 'json':
+            header('Content-Type: application/json');
             echo json_encode($output, JSON_UNESCAPED_UNICODE);
             break;
         case 'xml':
             echo "Not supported";
             break;
         case 'html':
+            header('Content-Type: text/html');
             echo "<pre>";
             print_r($output);
             echo "</pre>";

@@ -19,6 +19,7 @@ class Application
     }
 
     public function getObject(){
+        $application['id'] = $this->id;
         $application['name'] = $this->name;
         $application['apkName'] = $this->apkName;
         $application['forceInstall'] = $this->forceInstall;

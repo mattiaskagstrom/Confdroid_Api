@@ -127,14 +127,16 @@ class AdminFunctions
             if ($imei == null) {
                 $user->addDevices($this->getDevices($user->getId()));
             } else {
-                $user->addDevice($this->getDevice($imei, $user->getId()));
+                $device = $this->getDevice($imei, $user);
+                if($device)$user->addDevice($device);else http_response_code(400);
+
             }
             $user->addGroups($this->getGroupsByUserId($user->getId()));
-
+            $user = $this->getApplications(null, $user);
             return $user;
         }
-        $user = "Failed";
-        return $user;
+
+        return null;
     }
 
 
@@ -160,31 +162,53 @@ class AdminFunctions
         return null;
     }
 
-    public function getDevice($imei, $userID = null)
+    public function getDevice($imei, User $user = null)
     {
-        $stmt = $this->dbc->prepare("SELECT id, name, imei, date_created FROM device WHERE device.imei=:imei");
-        $stmt->bindParam(":imei", $imei);
+        if($user == null){
+            $stmt = $this->dbc->prepare("SELECT device.* FROM device WHERE device.imei=:imei");
+            $stmt->bindParam(":imei", $imei);
+        }else{
+            $stmt = $this->dbc->prepare("SELECT device.* FROM device, user_device WHERE device.imei=:imei AND user_device.user_id=:userID");
+            $stmt->bindParam(":imei", $imei);
+            $stmt->bindParam(":userID", $user->getID());
+        }
+
         $stmt->execute();
         $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (isset($stmtAnswer[0])) {
             $device = new Device($stmtAnswer[0]["id"], $stmtAnswer[0]["name"], $stmtAnswer[0]["imei"], $stmtAnswer[0]["date_created"]);
-            $device = $this->getApplications($device, $userID);
+            $device = $this->getApplications($device, $user);
             return $device;
         }
         return null;
     }
 
-    public function removeDeviceFromUser($userToken, $imei){
+    public function addDeviceToUser($userToken, $imei)
+    {
+        $stmt = $this->dbc->prepare("INSERT INTO user_device(user_id, device_id) VALUES((SELECT id FROM user WHERE auth_token=:authToken), (SELECT id FROM device WHERE imei=:imei))");
+        $stmt->bindParam(":authToken", $userToken);
+        $stmt->bindParam(":imei", $imei);
+        $stmt->execute();
+        if($stmt->errorCode()=="00000"){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    public function removeDeviceFromUser($userToken, $imei)
+    {
         $stmt = $this->dbc->prepare("DELETE FROM user_device WHERE device_id=(SELECT id FROM device WHERE imei=:imei) AND user_id=(SELECT id FROM user WHERE auth_token=:authToken)");
         $stmt->bindParam(":authToken", $userToken);
         $stmt->bindParam(":imei", $imei);
         $stmt->execute();
+        return true;
     }
 
     public function searchDevices($searchValue)
     {
         $stmt = $this->dbc->prepare("SELECT id, name, imei, date_created FROM device WHERE device.name LIKE :searchValue OR device.imei LIKE :searchValue");
-        $searchValue = "%". $searchValue ."%";
+        $searchValue = "%" . $searchValue . "%";
         $stmt->bindParam(":searchValue", $searchValue);
         $stmt->execute();
         $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -200,21 +224,80 @@ class AdminFunctions
         return null;
     }
 
+    public function addApplicationToUser($userToken, $applicationID)
+    {
+        $stmt = $this->dbc->prepare("INSERT INTO application_user(user_id, application_id) VALUES((SELECT id FROM user WHERE auth_token=:authToken), :applicationID)");
+        $stmt->bindParam(":authToken", $userToken);
+        $stmt->bindParam(":applicationID", $applicationID);
+        $stmt->execute();
+        if($stmt->errorCode()=="00000"){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    public function addApplicationToGroup($groupID, $applicationID)
+    {
+        $stmt = $this->dbc->prepare("INSERT INTO application_group(group_id, application_id) VALUES(:groupID, :applicationID)");
+        $stmt->bindParam(":groupID", $groupID);
+        $stmt->bindParam(":applicationID", $applicationID);
+        $stmt->execute();
+        if($stmt->errorCode()=="00000"){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    public function removeApplicationFromUser($userToken, $applicationID)
+    {
+        $stmt = $this->dbc->prepare("DELETE FROM application_user WHERE application_id=:applicationID AND user_id=(SELECT id FROM user WHERE auth_token=:authToken)");
+        $stmt->bindParam(":authToken", $userToken);
+        $stmt->bindParam(":applicationID", $applicationID);
+        $stmt->execute();
+        return true;
+    }
+
+    public function removeApplicationFromGroup($groupID, $applicationID)
+    {
+        $stmt = $this->dbc->prepare("DELETE FROM application_group WHERE group_id=:groupID AND application_id=:applicationID");
+        $stmt->bindParam(":groupID", $groupID);
+        $stmt->bindParam(":applicationID", $applicationID);
+        $stmt->execute();
+        if($stmt->errorCode()=="00000"){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
     /**
      * Returns all the applications on a device.
      * @param $device
-     * @return Device
+     * @return mixed
      */
-    private function getApplications(Device $device, $userID = null)
+    private function getApplications(Device $device = null, User $user = null)
     {
-        if($userID == null){
-            $stmt = $this->dbc->prepare("SELECT id, apk_name, apk_url, force_install, data_dir, friendly_name FROM application, application_device WHERE application.id = application_device.application_id AND application_device.device_id =:deviceID");
-        }else{
-            $stmt = $this->dbc->prepare("SELECT DISTINCT application.* FROM `application`, device, application_device, user, user_device WHERE `application`.id=application_device.application_id AND application_device.device_id=device.id AND user.id = user_device.user_id AND application_device.device_id = user_device.device_id AND user.id=:userID UNION DISTINCT SELECT DISTINCT application.* FROM `application`, `user`, application_user WHERE `application`.id=application_user.application_id AND application_user.user_id=`user`.id AND user.id=:userID UNION DISTINCT SELECT DISTINCT application.* FROM `application`, `group`, application_group, user, user_group WHERE `application`.id=application_group.application_id AND application_group.group_id=`group`.id AND user.id = user_group.user_id AND application_group.group_id = user_group.group_id AND user.id=:userID");
-            $stmt->bindParam(":userID", $userID);
+        if ($user == null && $device != null) {
+            $stmt = $this->dbc->prepare("SELECT application.* FROM application, application_device WHERE application.id = application_device.application_id AND application_device.device_id =:deviceID");
+            $deviceId = $device->getId();
+            $stmt->bindParam(":deviceID", $deviceId);
+            $addTo = $device;
+        } else if ($user != null && $device != null) {
+            $stmt = $this->dbc->prepare("SELECT DISTINCT application.* FROM `application`, device, application_device, user, user_device WHERE `application`.id=application_device.application_id AND application_device.device_id=device.id AND device.id=:deviceID AND user.id = user_device.user_id AND application_device.device_id = user_device.device_id AND user.id=:userID UNION DISTINCT SELECT DISTINCT application.* FROM `application`, `user`, application_user WHERE `application`.id=application_user.application_id AND application_user.user_id=`user`.id AND user.id=:userID UNION DISTINCT SELECT DISTINCT application.* FROM `application`, `group`, application_group, user, user_group WHERE `application`.id=application_group.application_id AND application_group.group_id=`group`.id AND user.id = user_group.user_id AND application_group.group_id = user_group.group_id AND user.id=:userID");
+            $stmt->bindParam(":userID", $user->getId());
+            $deviceId = $device->getId();
+            $stmt->bindParam(":deviceID", $deviceId);
+            $addTo = $device;
+        } else if ($device == null && $user != null) {
+            $stmt = $this->dbc->prepare("SELECT application.* FROM application, application_user WHERE application.id = application_user.application_id AND application_user.user_id =:userID");
+            $stmt->bindParam(":userID", $user->getId());
+            $addTo = $user;
+        } else {
+            return "error!";
         }
-        $deviceId = $device->getId();
-        $stmt->bindParam(":deviceID", $deviceId);
+
         $stmt->execute();
         $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.sql_setting, sql_setting.sql_location FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
@@ -228,7 +311,7 @@ class AdminFunctions
             $xmlSettingStmt->bindParam(":appID", $application["id"]);
             $xmlSettingStmt->execute();
             $xmlSettings = $xmlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
-            $app = new Application($application["id"], $application["data_dir"], $application["apk_name"], $application["apk_url"], $application["friendly_name"], $application["force_install"]);
+            $app = new Application($application["id"], $application["data_dir"], $application["apk_name"], $application["apk_url"], $application["friendly_name"], $application["force_install"], $application["package_name"]);
             foreach ($sqlSettings as $sqlSetting) {
                 $app->addSQL_setting(new SqlSetting($sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
             }
@@ -236,10 +319,80 @@ class AdminFunctions
                 $app->addXML_setting(new XmlSetting($xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
             }
 
-            $device->addApplication($app);
+            $addTo->addApplication($app);
         }
-        return $device;
+        return $addTo;
     }
+
+    public function searchApplications($searchValue = null, $appID = null){
+        if(!$appID){
+            $stmt = $this->dbc->prepare("SELECT * FROM application WHERE friendly_name LIKE :searchValue OR package_name LIKE :searchValue OR apk_name LIKE :searchValue");
+            $searchValue = "%".$searchValue."%";
+            $stmt->bindParam(":searchValue", $searchValue);
+        }else{
+            $stmt = $this->dbc->prepare("SELECT * FROM application WHERE id=:appID");
+            $stmt->bindParam(":appID", $appID);
+        }
+        $stmt->execute();
+        $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.sql_setting, sql_setting.sql_location FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
+        $xmlSettingStmt = $this->dbc->prepare("SELECT xml_setting.file_location, xml_setting.regularexp, xml_setting.replacewith FROM application, xml_setting, application_xml_setting WHERE application.id = application_xml_setting.application_id AND xml_setting.id = application_xml_setting.xml_setting_id AND application.id=:appID");
+        $usersStmt = $this->dbc->prepare("SELECT user.* FROM user, application_user WHERE application_user.user_id=user.id AND application_user.application_id=:appID");
+        $groupsStmt=$this->dbc->prepare("SELECT group.* FROM group, application_group WHERE application_group.group_id=group.id AND application_group.application_id=:appID");
+        $devicesStmt=$this->dbc->prepare("SELECT device.* FROM device, application_device WHERE application_device.device_id=device.id AND application_device.application_id=:appID");
+        $appArray = array();
+        foreach ($applications as $application) {
+            $usersStmt->bindParam(":appID", $application["id"]);
+            $usersStmt->execute();
+            $groupsStmt->bindParam(":appID", $application["id"]);
+            $groupsStmt->execute();
+            $devicesStmt->bindParam(":appID", $application["id"]);
+            $devicesStmt->execute();
+            $sqlSettingStmt->bindParam(":appID", $application["id"]);
+            $sqlSettingStmt->execute();
+            $sqlSettings = $sqlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
+            $xmlSettingStmt->bindParam(":appID", $application["id"]);
+            $xmlSettingStmt->execute();
+            $xmlSettings = $xmlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
+            $app = new Application($application["id"], $application["data_dir"], $application["apk_name"], $application["apk_url"], $application["friendly_name"], $application["force_install"], $application["package_name"]);
+            foreach ($sqlSettings as $sqlSetting) {
+                $app->addSQL_setting(new SqlSetting($sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
+            }
+            foreach ($xmlSettings as $xmlSetting) {
+                $app->addXML_setting(new XmlSetting($xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
+            }
+            $app->setUsers($usersStmt->fetchAll(PDO::FETCH_ASSOC));
+            $app->setGroups($groupsStmt->fetchAll(PDO::FETCH_ASSOC));
+            $app->setDevices($devicesStmt->fetchAll(PDO::FETCH_ASSOC));
+            array_push($appArray, $app->getObject());
+        }
+
+        return $appArray;
+    }
+
+    /*public function getApplication($applicationID)
+    {
+        $stmt = $this->dbc->prepare("SELECT id, apk_name, apk_url, force_install, data_dir, friendly_name, package_name FROM application WHERE application.id=:applicationID");
+        $stmt->bindParam(":applicationID", $applicationID);
+        $stmt->execute();
+        $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.sql_setting, sql_setting.sql_location FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
+        $xmlSettingStmt = $this->dbc->prepare("SELECT xml_setting.file_location, xml_setting.regularexp, xml_setting.replacewith FROM application, xml_setting, application_xml_setting WHERE application.id = application_xml_setting.application_id AND xml_setting.id = application_xml_setting.xml_setting_id AND application.id=:appID");
+        $sqlSettingStmt->bindParam(":appID", $applications[0]["id"]);
+        $sqlSettingStmt->execute();
+        $sqlSettings = $sqlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
+        $xmlSettingStmt->bindParam(":appID", $applications[0]["id"]);
+        $xmlSettingStmt->execute();
+        $xmlSettings = $xmlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
+        $app = new Application($applications[0]["id"], $applications[0]["data_dir"], $applications[0]["apk_name"], $applications[0]["apk_url"], $applications[0]["friendly_name"], $applications[0]["force_install"], $applications[0]["package_name"]);
+        foreach ($sqlSettings as $sqlSetting) {
+            $app->addSQL_setting(new SqlSetting($sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
+        }
+        foreach ($xmlSettings as $xmlSetting) {
+            $app->addXML_setting(new XmlSetting($xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
+        }
+        return $app->getObject();
+    }*/
 
     /**
      * @param $userId
@@ -260,11 +413,26 @@ class AdminFunctions
         return null;
     }
 
-    public function removeGroupFromUser($userToken, $groupID){
+    public function removeGroupFromUser($userToken, $groupID)
+    {
         $stmt = $this->dbc->prepare("DELETE FROM user_group WHERE group_id=:groupID AND user_id=(SELECT id FROM user WHERE auth_token=:authToken)");
         $stmt->bindParam(":authToken", $userToken);
         $stmt->bindParam(":groupID", $groupID);
         $stmt->execute();
+        return true;
+    }
+
+    public function addGroupToUser($userToken, $groupID)
+    {
+        $stmt = $this->dbc->prepare("INSERT INTO user_group(user_id, group_id) VALUES((SELECT id FROM user WHERE auth_token=:authToken), :groupID)");
+        $stmt->bindParam(":authToken", $userToken);
+        $stmt->bindParam(":groupID", $groupID);
+        $stmt->execute();
+        if($stmt->errorCode()=="00000"){
+            return true;
+        }else{
+            return false;
+        }
     }
 
     public function addUser($name, $email)
@@ -291,7 +459,7 @@ class AdminFunctions
 
         } else if (isset($token)) {
             $stmt = $this->dbc->prepare("DELETE FROM user WHERE auth_token=:token;");
-            $stmt->bindParam(":id", $id);
+            $stmt->bindParam(":token", $token);
 
         } else {
             return false;
@@ -351,7 +519,7 @@ class AdminFunctions
         }
         foreach ($applicationsstmtAnswer as $applicationValues) {
 
-            $group->addApplication(new Application($applicationValues["id"], $applicationValues["data_dir"], $applicationValues["apk_name"], $applicationValues["apk_url"], $applicationValues["friendly_name"], $applicationValues["force_install"]));
+            $group->addApplication(new Application($applicationValues["id"], $applicationValues["data_dir"], $applicationValues["apk_name"], $applicationValues["apk_url"], $applicationValues["friendly_name"], $applicationValues["force_install"], $applicationValues["package_name"]));
         }
 
         return $group->getObject();
@@ -369,29 +537,7 @@ class AdminFunctions
     }
 
 
-    public function getApplication($applicationID)
-    {
-        $stmt = $this->dbc->prepare("SELECT id, apk_name, apk_url, force_install, data_dir, friendly_name FROM application WHERE application.id=:applicationID");
-        $stmt->bindParam(":applicationID", $applicationID);
-        $stmt->execute();
-        $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.sql_setting, sql_setting.sql_location FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
-        $xmlSettingStmt = $this->dbc->prepare("SELECT xml_setting.file_location, xml_setting.regularexp, xml_setting.replacewith FROM application, xml_setting, application_xml_setting WHERE application.id = application_xml_setting.application_id AND xml_setting.id = application_xml_setting.xml_setting_id AND application.id=:appID");
-        $sqlSettingStmt->bindParam(":appID", $applications[0]["id"]);
-        $sqlSettingStmt->execute();
-        $sqlSettings = $sqlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
-        $xmlSettingStmt->bindParam(":appID", $applications[0]["id"]);
-        $xmlSettingStmt->execute();
-        $xmlSettings = $xmlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
-        $app = new Application($applications[0]["id"], $applications[0]["data_dir"], $applications[0]["apk_name"], $applications[0]["apk_url"], $applications[0]["friendly_name"], $applications[0]["force_install"]);
-        foreach ($sqlSettings as $sqlSetting) {
-            $app->addSQL_setting(new SqlSetting($sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
-        }
-        foreach ($xmlSettings as $xmlSetting) {
-            $app->addXML_setting(new XmlSetting($xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
-        }
-        return $app->getObject();
-    }
+
 
 
     function getRealIpAddr()

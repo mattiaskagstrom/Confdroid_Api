@@ -30,7 +30,7 @@ class Device
     }
 
     function getObject(){
-
+        $device["id"] = $this->id;
         $device["name"] = $this->name;
         $device["imei"] = $this->imei;
         $device["dateCreated"] = $this->dateCreated;

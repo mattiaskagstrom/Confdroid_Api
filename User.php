@@ -42,6 +42,7 @@ class User
         $user["dateCreated"] = $this->dateCreated;
         $user["devices"] = $this->devices;
         $user["groups"] = $this->groups;
+        $user["applications"] = $this->applications;
         return $user;
     }
 
@@ -79,7 +80,7 @@ class User
     /**
      * @return array
      */
-    public function getApplications(): array
+    public function getApplications()
     {
         return $this->applications;
     }

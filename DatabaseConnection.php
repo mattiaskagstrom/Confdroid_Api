@@ -49,13 +49,14 @@ class DatabaseConnection
                 } else {
                     if (isset($_GET["imei"])) {//User is requesting himself with a specific device
                         $user = $this->adminFunctions->getUser($request[2], $_GET["imei"]);
-                        //$user = $this->applicationFunctions->getUser($request[2]);    //Gets User
+
                         if ($user == null) {
                             http_response_code(403);
                             die();
                         }
-
-                        $device = $user->getDevices()[0];
+                        $devices =$user->getDevices();
+                        $device = null;
+                        if(isset($devices[0]))$device = $devices[0];
                         if ($device == null) {
                             http_response_code(404);
                             return "No device on this imei, contact administration for support";
@@ -116,7 +117,7 @@ class DatabaseConnection
             case "application":
                 $this->authorizeAdmin();
                 if (isset($request[2])) {
-                    $application = $this->adminFunctions->getApplication($request[2]);
+                    $application = $this->adminFunctions->searchApplications(null, $request[2]);
                     if ($application == null) {
                         http_response_code(404);
                         return "no application with that id";
@@ -124,6 +125,9 @@ class DatabaseConnection
                         return $application;
                     }
                 }
+                $searchValue = null;
+                if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
+                return $this->adminFunctions->searchApplications($searchValue);
                 break;
 
         }
@@ -146,9 +150,44 @@ class DatabaseConnection
                 break;
             case "user":
                 $this->authorizeAdmin();
-                if ($this->adminFunctions->addUser($_POST["name"], $_POST["email"])) {
-                    http_response_code(201);
+                if (isset($request[2])) {//authToken
+                    if (isset($request[3])) {//group/device/application
+                        switch ($request[3]){
+                            case "group":
+                                if(isset($request[4]))if($this->adminFunctions->addGroupToUser($request[2], $request[4]))http_response_code(201);else http_response_code(409);
+                                break;
+                            case "device":
+                                if(isset($request[4]))if($this->adminFunctions->addDeviceToUser($request[2], $request[4]))http_response_code(201);else http_response_code(409);
+                                break;
+                            case "application":
+                                if(isset($request[4]))if($this->adminFunctions->addApplicationToUser($request[2], $request[4]))http_response_code(201);else http_response_code(409);
+                                break;
+                        }
+                    } else {
+
+                    }
+                } else {
+                    if ($this->adminFunctions->addUser($_POST["name"], $_POST["email"])) {
+                        http_response_code(201);
+                    }else{
+                        http_response_code(400);
+                    }
                 }
+                break;
+            case "group":
+                    if(isset($request[2])){//groupID
+                        if(isset($request[3])){
+                            switch ($request[3]){
+                                case "application":
+                                    if(isset($request[4])){//applicationID
+                                        $this->adminFunctions->addApplicationToGroup($request[2], $request[4]);
+                                    }
+                            }
+                        }
+
+                    }else{
+
+                    }
                 break;
             default:
                 http_response_code(404);
@@ -179,14 +218,17 @@ class DatabaseConnection
                     if (isset($request[3])) {
                         switch ($request[3]){
                             case "group":
-                                if(isset($request[4]))$this->adminFunctions->removeGroupFromUser($request[2], $request[4]);
+                                if(isset($request[4]))if($this->adminFunctions->removeGroupFromUser($request[2], $request[4]))http_response_code(204);
                                 break;
                             case "device":
-                                if(isset($request[4]))$this->adminFunctions->removeDeviceFromUser($request[2], $request[4]);
+                                if(isset($request[4]))if($this->adminFunctions->removeDeviceFromUser($request[2], $request[4]))http_response_code(204);
+                                break;
+                            case "application":
+                                if(isset($request[4]))if($this->adminFunctions->removeApplicationFromUser($request[2], $request[4]))http_response_code(204);
                                 break;
                         }
                     } else {
-                        if (!$this->$this->adminFunctions->removeUser(null, $request[2])) http_response_code(400);
+                        if (!$this->adminFunctions->removeUser(null, $request[2])) http_response_code(400);
                     }
                 } else {
                     http_response_code(400);
@@ -195,6 +237,23 @@ class DatabaseConnection
             case "group":
                 if (isset($request[2])) {
                     $this->adminFunctions->deleteGroup($request[2]);
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "device":
+                if (isset($request[2])) {
+                    $this->adminFunctions->deleteDevice($request[2]);
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "application":
+                if (isset($request[2])) {
+                    $this->adminFunctions->deleteApplication($request[2]);
+                    return;
                 } else {
                     http_response_code(400);
                 }

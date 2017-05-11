@@ -29,7 +29,7 @@ class Application
         $application['apkURL'] = $this->apkURL;
         $application['SQL_settings'] = $this->SQL_settings;
         $application['XML_settings'] = $this->XML_settings;
-        $application["user"]=$this->users;
+        $application["users"]=$this->users;
         $application["groups"]=$this->groups;
         $application["devices"]=$this->devices;
         return $application;

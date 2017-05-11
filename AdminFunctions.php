@@ -117,11 +117,11 @@ class AdminFunctions
 
     public function getUser($authToken, $imei = null)
     {
-        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE auth_token=:authToken");
+        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE BINARY auth_token=:authToken");
         $stmt->bindParam(":authToken", $authToken);
         $stmt->execute();
         $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $i = 0;
+
         if (isset($queriedUsers[0])) {
             $user = new User($queriedUsers[0]["id"], $queriedUsers[0]["name"], $queriedUsers[0]["mail"], $queriedUsers[0]["auth_token"], $queriedUsers[0]["date_created"]);
             if ($imei == null) {
@@ -168,7 +168,7 @@ class AdminFunctions
             $stmt = $this->dbc->prepare("SELECT device.* FROM device WHERE device.imei=:imei");
             $stmt->bindParam(":imei", $imei);
         }else{
-            $stmt = $this->dbc->prepare("SELECT device.* FROM device, user_device WHERE device.imei=:imei AND user_device.user_id=:userID");
+            $stmt = $this->dbc->prepare("SELECT device.* FROM device, user_device WHERE device.imei=:imei AND user_device.device_id=device.id AND user_device.user_id=:userID");
             $stmt->bindParam(":imei", $imei);
             $stmt->bindParam(":userID", $user->getID());
         }
@@ -181,6 +181,42 @@ class AdminFunctions
             return $device;
         }
         return null;
+    }
+
+    public function updateDevice($imei, $json){
+        $device = json_decode($json, true);
+        $query= "";
+        if(isset($device["imei"])){
+            $query .="imei=:imei ";
+        }
+        if(isset($device["imei"]) && isset($device["name"])){
+            $query.= ", ";
+        }
+        if(isset($device["name"])){
+            $query .="name=:name ";
+        }
+        $check = $this->dbc->prepare("SELECT * FROM device WHERE imei=:oldimei");
+        $check->bindParam(":oldimei", $imei);
+        $check->execute();
+        if($check->rowCount()<1){
+            echo "No device with that imei!";
+            http_response_code(404);
+            return true;
+        }
+        $stmt = $this->dbc->prepare("UPDATE device SET $query WHERE imei=:oldimei");
+        $stmt->bindParam(":oldimei", $imei);
+        if(isset($device["imei"])){
+            $stmt->bindParam(":imei", $device["imei"]);
+        }
+        if(isset($device["name"])){
+            $stmt->bindParam(":name", $device["name"]);
+        }
+        $stmt->execute();
+        if($stmt->errorCode()=="00000"){
+            return true;
+        }else{
+            return false;
+        }
     }
 
     public function addDeviceToUser($userToken, $imei)
@@ -300,8 +336,8 @@ class AdminFunctions
 
         $stmt->execute();
         $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.sql_setting, sql_setting.sql_location FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
-        $xmlSettingStmt = $this->dbc->prepare("SELECT xml_setting.file_location, xml_setting.regularexp, xml_setting.replacewith FROM application, xml_setting, application_xml_setting WHERE application.id = application_xml_setting.application_id AND xml_setting.id = application_xml_setting.xml_setting_id AND application.id=:appID");
+        $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.* FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
+        $xmlSettingStmt = $this->dbc->prepare("SELECT xml_setting.* FROM application, xml_setting, application_xml_setting WHERE application.id = application_xml_setting.application_id AND xml_setting.id = application_xml_setting.xml_setting_id AND application.id=:appID");
 
         foreach ($applications as $application) {
 
@@ -313,10 +349,10 @@ class AdminFunctions
             $xmlSettings = $xmlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
             $app = new Application($application["id"], $application["data_dir"], $application["apk_name"], $application["apk_url"], $application["friendly_name"], $application["force_install"], $application["package_name"]);
             foreach ($sqlSettings as $sqlSetting) {
-                $app->addSQL_setting(new SqlSetting($sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
+                $app->addSQL_setting(new SqlSetting($sqlSetting["id"], $sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
             }
             foreach ($xmlSettings as $xmlSetting) {
-                $app->addXML_setting(new XmlSetting($xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
+                $app->addXML_setting(new XmlSetting($xmlSetting["id"], $xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
             }
 
             $addTo->addApplication($app);
@@ -335,10 +371,10 @@ class AdminFunctions
         }
         $stmt->execute();
         $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.sql_setting, sql_setting.sql_location FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
-        $xmlSettingStmt = $this->dbc->prepare("SELECT xml_setting.file_location, xml_setting.regularexp, xml_setting.replacewith FROM application, xml_setting, application_xml_setting WHERE application.id = application_xml_setting.application_id AND xml_setting.id = application_xml_setting.xml_setting_id AND application.id=:appID");
+        $sqlSettingStmt = $this->dbc->prepare("SELECT sql_setting.* FROM application, sql_setting, application_sql_setting WHERE application.id = application_sql_setting.application_id AND sql_setting.id = application_sql_setting.sql_setting_id AND application.id=:appID");
+        $xmlSettingStmt = $this->dbc->prepare("SELECT xml_setting.* FROM application, xml_setting, application_xml_setting WHERE application.id = application_xml_setting.application_id AND xml_setting.id = application_xml_setting.xml_setting_id AND application.id=:appID");
         $usersStmt = $this->dbc->prepare("SELECT user.* FROM user, application_user WHERE application_user.user_id=user.id AND application_user.application_id=:appID");
-        $groupsStmt=$this->dbc->prepare("SELECT group.* FROM group, application_group WHERE application_group.group_id=group.id AND application_group.application_id=:appID");
+        $groupsStmt=$this->dbc->prepare("SELECT `group`.* FROM `group`, application_group WHERE application_group.group_id=`group`.id AND application_group.application_id=:appID");
         $devicesStmt=$this->dbc->prepare("SELECT device.* FROM device, application_device WHERE application_device.device_id=device.id AND application_device.application_id=:appID");
         $appArray = array();
         foreach ($applications as $application) {
@@ -356,10 +392,10 @@ class AdminFunctions
             $xmlSettings = $xmlSettingStmt->fetchAll(PDO::FETCH_ASSOC);
             $app = new Application($application["id"], $application["data_dir"], $application["apk_name"], $application["apk_url"], $application["friendly_name"], $application["force_install"], $application["package_name"]);
             foreach ($sqlSettings as $sqlSetting) {
-                $app->addSQL_setting(new SqlSetting($sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
+                $app->addSQL_setting(new SqlSetting($sqlSetting["id"], $sqlSetting["sql_location"], $sqlSetting["sql_setting"]));
             }
             foreach ($xmlSettings as $xmlSetting) {
-                $app->addXML_setting(new XmlSetting($xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
+                $app->addXML_setting(new XmlSetting($xmlSetting["id"], $xmlSetting["file_location"], $xmlSetting["regularexp"], $xmlSetting["replacewith"]));
             }
             $app->setUsers($usersStmt->fetchAll(PDO::FETCH_ASSOC));
             $app->setGroups($groupsStmt->fetchAll(PDO::FETCH_ASSOC));
@@ -435,15 +471,42 @@ class AdminFunctions
         }
     }
 
-    public function addUser($name, $email)
-    {
-        $token = bin2hex(openssl_random_pseudo_bytes(16));          //Creates random hex Token
-        $stmt = $this->dbc->prepare("INSERT INTO user(name, mail, auth_token) VALUES(:name, :mail, :authToken)");
-        $stmt->bindParam(":name", $name);
-        $stmt->bindParam(":mail", $email);
-        $stmt->bindParam(":authToken", $token);
+    public function createGroup($json){
+        $group = json_decode($json, true);
+        if(!isset($group["prio"]))$group["prio"]=50;
+        if(!isset($group["name"])){
+            http_response_code(400);
+            return false;
+        }
+        if($group["name"] == ""){
+            http_response_code(400);
+            return false;
+        }
+        $stmt = $this->dbc->prepare("INSERT INTO `group`(prio, name) VALUES(:prio, :name)");
+        $stmt->bindParam(":prio", $group["prio"]);
+        $stmt->bindParam(":name", $group["name"]);
         $stmt->execute();
         if ($stmt->errorCode() == 00000) return true;
+        return false;
+    }
+
+    public function addUser($json)
+    {
+
+        $user=json_decode($json,true);
+        if(isset($user["email"]) && isset($user["name"])){
+            if($user["email"] != "" && $user["name"] != ""){
+                $token = bin2hex(openssl_random_pseudo_bytes(16));          //Creates random hex Token
+                $stmt = $this->dbc->prepare("INSERT INTO user(name, mail, auth_token) VALUES(:name, :mail, :authToken)");
+                $stmt->bindParam(":name", $user["name"]);
+                $stmt->bindParam(":mail", $user["email"]);
+                $stmt->bindParam(":authToken", $token);
+                $stmt->execute();
+                if ($stmt->errorCode() == 00000) return true;
+                return false;
+            }
+        }
+        http_response_code(400);
         return false;
     }
 
@@ -534,6 +597,104 @@ class AdminFunctions
         $stmt->execute();
         if ($stmt->errorCode() == 00000) return true;
         return false;
+    }
+
+
+    public function updateSqlSetting($sqlSettingID, $json){
+        $sqlSetting = json_decode($json, true);
+        $query= "";
+        if(isset($sqlSetting["dblocation"])){
+            $query .="sql_location=:dblocation ";
+        }
+        if(isset($sqlSetting["dblocation"]) && isset($sqlSetting["query"])){
+            $query.= ", ";
+        }
+        if(isset($sqlSetting["query"])){
+            $query .="sql_setting=:query ";
+        }
+        $check = $this->dbc->prepare("SELECT * FROM sql_setting WHERE id=:id");
+        $check->bindParam(":id", $sqlSettingID);
+        $check->execute();
+        if($check->rowCount()<1){
+            echo "No sql setting with that id!";
+            http_response_code(404);
+            return true;
+        }
+        $stmt = $this->dbc->prepare("UPDATE sql_setting SET $query WHERE id=:id");
+        $stmt->bindParam(":id", $sqlSettingID);
+        if(isset($sqlSetting["dblocation"])){
+            $stmt->bindParam(":dblocation", $sqlSetting["dblocation"]);
+        }
+        if(isset($sqlSetting["query"])){
+            $stmt->bindParam(":query", $sqlSetting["query"]);
+        }
+        $stmt->execute();
+        if($stmt->errorCode()=="00000"){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    public function addSqlSetting(){
+
+    }
+
+    public function removeSqlSetting(){
+
+    }
+
+    public function updateXmlSetting($xmlSettingID, $json){
+        $sqlSetting = json_decode($json, true);
+        $query= "";
+        if(isset($sqlSetting["fileLocation"])){
+            $query .="file_location=:fileLocation ";
+        }
+        if(isset($sqlSetting["fileLocation"]) && isset($sqlSetting["regexp"])){
+            $query.= ", ";
+        }
+        if(isset($sqlSetting["regexp"])){
+            $query .="regularexp=:regexp ";
+        }
+        if(isset($sqlSetting["regexp"]) && isset($sqlSetting["replaceWith"])){
+            $query.= ", ";
+        }
+        if(isset($sqlSetting["replaceWith"])){
+            $query .="replacewith=:replaceWith ";
+        }
+        $check = $this->dbc->prepare("SELECT * FROM xml_setting WHERE id=:id");
+        $check->bindParam(":id", $xmlSettingID);
+        $check->execute();
+        if($check->rowCount()<1){
+            echo "No xml setting with that id!";
+            http_response_code(404);
+            return true;
+        }
+        $stmt = $this->dbc->prepare("UPDATE xml_setting SET $query WHERE id=:id");
+        $stmt->bindParam(":id", $xmlSettingID);
+        if(isset($sqlSetting["fileLocation"])){
+            $stmt->bindParam(":fileLocation", $sqlSetting["fileLocation"]);
+        }
+        if(isset($sqlSetting["regexp"])){
+            $stmt->bindParam(":regexp", $sqlSetting["regexp"]);
+        }
+        if(isset($sqlSetting["replaceWith"])){
+            $stmt->bindParam(":replaceWith", $sqlSetting["replaceWith"]);
+        }
+        $stmt->execute();
+        if($stmt->errorCode()=="00000"){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    public function addXmlSetting(){
+
+    }
+
+    public function removeXmlSetting(){
+
     }
 
 

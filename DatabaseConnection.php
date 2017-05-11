@@ -122,7 +122,7 @@ class DatabaseConnection
                         http_response_code(404);
                         return "no application with that id";
                     } else {
-                        return $application;
+                        return $application[0];
                     }
                 }
                 $searchValue = null;
@@ -137,6 +137,7 @@ class DatabaseConnection
 
     public function post($request)
     {
+        $postjson = file_get_contents("php://input");
         switch ($request[1]) {
             case "admin":
                 switch ($request[2]) {
@@ -167,7 +168,7 @@ class DatabaseConnection
 
                     }
                 } else {
-                    if ($this->adminFunctions->addUser($_POST["name"], $_POST["email"])) {
+                    if ($this->adminFunctions->addUser($postjson)) {
                         http_response_code(201);
                     }else{
                         http_response_code(400);
@@ -175,6 +176,7 @@ class DatabaseConnection
                 }
                 break;
             case "group":
+                $this->authorizeAdmin();
                     if(isset($request[2])){//groupID
                         if(isset($request[3])){
                             switch ($request[3]){
@@ -186,7 +188,7 @@ class DatabaseConnection
                         }
 
                     }else{
-
+                        $this->adminFunctions->createGroup($postjson);
                     }
                 break;
             default:
@@ -198,12 +200,48 @@ class DatabaseConnection
     public function put($request)
     {
         $this->authorizeAdmin();
-        $putvars = json_decode(file_get_contents("php://input"));
+        $putjson = file_get_contents("php://input");
 
         switch ($request[1]) {
             case "user":
                 if (isset($request[2])) {
-                    $this->adminFunctions->updateUser($request[2], $putvars["name"], $putvars["mail"]);
+                    $this->adminFunctions->updateUser($request[2], $putjson);
+                }
+                break;
+            case "device":
+                if (isset($request[2])) {
+                    if($this->adminFunctions->updateDevice($request[2], $putjson)){
+
+                    }else{
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "xmlsetting":
+                if (isset($request[2])) {
+                    if($this->adminFunctions->updateXmlSetting($request[2], $putjson)){
+
+                    }else{
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "sqlsetting":
+                if (isset($request[2])) {
+                    if($this->adminFunctions->updateSqlSetting($request[2], $putjson)){
+
+                    }else{
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
                 }
                 break;
         }

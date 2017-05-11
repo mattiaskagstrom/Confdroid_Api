@@ -9,10 +9,11 @@
 class XmlSetting
 {
 
-    private $fileLocation, $regexp, $replaceWith;
+    private $fileLocation, $regexp, $replaceWith, $id;
 
-    public function __construct($fileLocation, $regexp, $replaceWith)
+    public function __construct($id, $fileLocation, $regexp, $replaceWith)
     {
+        $this->id = $id;
         $this->fileLocation=$fileLocation;
         $this->regexp = $regexp;
         $this->replaceWith = $replaceWith;
@@ -43,6 +44,7 @@ class XmlSetting
     }
 
     public function getObject(){
+        $array["id"] = $this->id;
         $array["fileLocation"] = $this->fileLocation;
         $array["regexp"] = $this->regexp;
         $array["replaceWith"] = $this->replaceWith;

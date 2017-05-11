@@ -8,15 +8,17 @@
  */
 class SqlSetting
 {
-    private $dblocation, $query;
+    private $dblocation, $query, $id;
 
-    function __construct($dblocation, $query)
+    function __construct($id, $dblocation, $query)
     {
+        $this->id = $id;
         $this->dblocation = $dblocation;
         $this->query = $query;
     }
 
     public function getObject(){
+        $object["id"] = $this->id;
         $object["dblocation"] = $this->dblocation;
         $object["query"] = $this->query;
         return $object;

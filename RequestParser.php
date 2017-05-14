@@ -4,30 +4,22 @@
  * Connection between database and API.
  */
 spl_autoload_register(function ($class_name) {
+    /** @noinspection PhpIncludeInspection */
     include $class_name . '.php';
 });
 
 
-class DatabaseConnection
+class RequestParser
 {
-    private $dbc;
-    //private $applicationFunctions;
-    private $adminFunctions;
+
+    private $databaseFunctions;
 
     /**
-     * DatabaseConnection constructor.
+     * RequestParser constructor.
      */
     function __construct()
     {
-        $dsn = 'mysql:host=localhost;dbname=confdroid_test';
-        $username = 'confdroid_test';
-        $password = 'tutus';
-        $options = array(
-            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
-        );
-        $this->dbc = new PDO($dsn, $username, $password, $options);
-        //$this->applicationFunctions = new ApplicationFunctions($this->dbc);
-        $this->adminFunctions = new AdminFunctions($this->dbc);
+        $this->databaseFunctions = new DatabaseFunctions();
     }
 
     /**
@@ -39,24 +31,24 @@ class DatabaseConnection
     {
 
         switch ($request[1]) {
-            case "user":
-                if (!isset($request[2])) {//Admin wants to search for a user
-                    $this->authorizeAdmin();
+            case "user": //user is requested
+                if (!isset($request[2])) {//Admin wants to fetch users
+                    $this->authorizeAdmin();//Make sure the admin is authorized
                     $searchValue = null;
-                    if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
-                    $users = $this->adminFunctions->searchUsers($searchValue, $searchValue);
+                    if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];//iff the admin have defined a search, search for that, if not, return all users
+                    $users = $this->databaseFunctions->searchUsers($searchValue);
                     return $users;
                 } else {
-                    if (isset($_GET["imei"])) {//User is requesting himself with a specific device
-                        $user = $this->adminFunctions->getUser($request[2], $_GET["imei"]);
+                    if (isset($_GET["imei"])) {//User is requesting himself with a specific device using authToken
+                        $user = $this->databaseFunctions->getUserWithAuthtoken($request[2], $_GET["imei"]);
 
                         if ($user == null) {
                             http_response_code(403);
                             die();
                         }
-                        $devices =$user->getDevices();
+                        $devices = $user->getDevices();
                         $device = null;
-                        if(isset($devices[0]))$device = $devices[0];
+                        if (isset($devices[0])) $device = $devices[0];
                         if ($device == null) {
                             http_response_code(404);
                             return "No device on this imei, contact administration for support";
@@ -76,8 +68,8 @@ class DatabaseConnection
                             return "No device found";
                         }
                     } else {
-                        if ($this->authorizeAdmin()) {//admin is requesting a specific user
-                            $user = $this->adminFunctions->getUser($request[2]);
+                        if ($this->authorizeAdmin()) {//admin is requesting a specific user using id
+                            $user = $this->databaseFunctions->getUserWithID($request[2]);
                             if ($user == null) {
                                 http_response_code(404);
                                 die();
@@ -92,32 +84,32 @@ class DatabaseConnection
             case "group":
                 $this->authorizeAdmin();
                 if (isset($request[2])) {
-                    return $this->adminFunctions->getGroup($request[2]);
+                    return $this->databaseFunctions->getGroup($request[2]);
                     break;
                 }
                 $searchValue = null;
                 if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
-                return $this->adminFunctions->searchGroups($searchValue);
+                return $this->databaseFunctions->searchGroups($searchValue);
                 break;
             case "device":
                 $this->authorizeAdmin();
                 if (isset($request[2])) {
-                    $device = $this->adminFunctions->getDevice($request[2])->getObject();
+                    $device = $this->databaseFunctions->getDevice($request[2]);//with id
                     if ($device == null) {
                         http_response_code(404);
                         return "no device with that imei";
                     } else {
-                        return $device;
+                        return $device->getObject();
                     }
                 }
                 $searchValue = null;
                 if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
-                return $this->adminFunctions->searchDevices($searchValue);
+                return $this->databaseFunctions->searchDevices($searchValue);
                 break;
             case "application":
                 $this->authorizeAdmin();
                 if (isset($request[2])) {
-                    $application = $this->adminFunctions->searchApplications(null, $request[2]);
+                    $application = $this->databaseFunctions->searchApplications(null, $request[2]);
                     if ($application == null) {
                         http_response_code(404);
                         return "no application with that id";
@@ -127,184 +119,12 @@ class DatabaseConnection
                 }
                 $searchValue = null;
                 if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
-                return $this->adminFunctions->searchApplications($searchValue);
+                return $this->databaseFunctions->searchApplications($searchValue);
                 break;
 
         }
         http_response_code(404);
         return "no such resource";
-    }
-
-    public function post($request)
-    {
-        $postjson = file_get_contents("php://input");
-        switch ($request[1]) {
-            case "admin":
-                switch ($request[2]) {
-                    case "login":
-                        return $this->adminFunctions->login($_POST["username"], $_POST["password"]);
-                        break;
-                    default:
-                        http_response_code(404);
-                        return "No such unit to get";
-                }
-                break;
-            case "user":
-                $this->authorizeAdmin();
-                if (isset($request[2])) {//authToken
-                    if (isset($request[3])) {//group/device/application
-                        switch ($request[3]){
-                            case "group":
-                                if(isset($request[4]))if($this->adminFunctions->addGroupToUser($request[2], $request[4]))http_response_code(201);else http_response_code(409);
-                                break;
-                            case "device":
-                                if(isset($request[4]))if($this->adminFunctions->addDeviceToUser($request[2], $request[4]))http_response_code(201);else http_response_code(409);
-                                break;
-                            case "application":
-                                if(isset($request[4]))if($this->adminFunctions->addApplicationToUser($request[2], $request[4]))http_response_code(201);else http_response_code(409);
-                                break;
-                        }
-                    } else {
-
-                    }
-                } else {
-                    if ($this->adminFunctions->addUser($postjson)) {
-                        http_response_code(201);
-                    }else{
-                        http_response_code(400);
-                    }
-                }
-                break;
-            case "group":
-                $this->authorizeAdmin();
-                    if(isset($request[2])){//groupID
-                        if(isset($request[3])){
-                            switch ($request[3]){
-                                case "application":
-                                    if(isset($request[4])){//applicationID
-                                        $this->adminFunctions->addApplicationToGroup($request[2], $request[4]);
-                                    }
-                            }
-                        }
-
-                    }else{
-                        $this->adminFunctions->createGroup($postjson);
-                    }
-                break;
-            default:
-                http_response_code(404);
-                return "No such unit to get";
-        }
-    }
-
-    public function put($request)
-    {
-        $this->authorizeAdmin();
-        $putjson = file_get_contents("php://input");
-
-        switch ($request[1]) {
-            case "user":
-                if (isset($request[2])) {
-                    $this->adminFunctions->updateUser($request[2], $putjson);
-                }
-                break;
-            case "device":
-                if (isset($request[2])) {
-                    if($this->adminFunctions->updateDevice($request[2], $putjson)){
-
-                    }else{
-                        http_response_code(400);
-                    }
-                    return;
-                } else {
-                    http_response_code(400);
-                }
-                break;
-            case "xmlsetting":
-                if (isset($request[2])) {
-                    if($this->adminFunctions->updateXmlSetting($request[2], $putjson)){
-
-                    }else{
-                        http_response_code(400);
-                    }
-                    return;
-                } else {
-                    http_response_code(400);
-                }
-                break;
-            case "sqlsetting":
-                if (isset($request[2])) {
-                    if($this->adminFunctions->updateSqlSetting($request[2], $putjson)){
-
-                    }else{
-                        http_response_code(400);
-                    }
-                    return;
-                } else {
-                    http_response_code(400);
-                }
-                break;
-        }
-    }
-
-    public function delete($request)
-    {
-        $this->authorizeAdmin();
-        switch ($request[1]) {
-            case "user": //DELETE /user/{authToken}/groups/{groupID}.json
-                if (isset($request[2])) {
-                    if (isset($request[3])) {
-                        switch ($request[3]){
-                            case "group":
-                                if(isset($request[4]))if($this->adminFunctions->removeGroupFromUser($request[2], $request[4]))http_response_code(204);
-                                break;
-                            case "device":
-                                if(isset($request[4]))if($this->adminFunctions->removeDeviceFromUser($request[2], $request[4]))http_response_code(204);
-                                break;
-                            case "application":
-                                if(isset($request[4]))if($this->adminFunctions->removeApplicationFromUser($request[2], $request[4]))http_response_code(204);
-                                break;
-                        }
-                    } else {
-                        if (!$this->adminFunctions->removeUser(null, $request[2])) http_response_code(400);
-                    }
-                } else {
-                    http_response_code(400);
-                }
-                break;
-            case "group":
-                if (isset($request[2])) {
-                    $this->adminFunctions->deleteGroup($request[2]);
-                    return;
-                } else {
-                    http_response_code(400);
-                }
-                break;
-            case "device":
-                if (isset($request[2])) {
-                    $this->adminFunctions->deleteDevice($request[2]);
-                    return;
-                } else {
-                    http_response_code(400);
-                }
-                break;
-            case "application":
-                if (isset($request[2])) {
-                    $this->adminFunctions->deleteApplication($request[2]);
-                    return;
-                } else {
-                    http_response_code(400);
-                }
-                break;
-            case "admin":
-                switch ($request[2]) {
-                    case "login":
-                        $this->authorizeAdmin(true);
-                        break;
-                }
-                break;
-        }
-
     }
 
     private function authorizeAdmin($logout = false)
@@ -323,15 +143,188 @@ class DatabaseConnection
             die();
         }
         if ($logout == true) {
-            $this->adminFunctions->logout($authToken, $id);
+            $this->databaseFunctions->logout($authToken, $id);
             die();
         }
-        if ($this->adminFunctions->authorizeAdmin($authToken, $id)) {
+        if ($this->databaseFunctions->authorizeAdmin($authToken, $id)) {
             return true;
         } else {
             echo "Invalid credentials";
             http_response_code(403);
             die();
         }
+    }
+
+    public function post($request)
+    {
+        $postjson = file_get_contents("php://input");
+        switch ($request[1]) {
+            case "admin":
+                switch ($request[2]) {
+                    case "login":
+                        return $this->databaseFunctions->login($_POST["username"], $_POST["password"]);
+                        break;
+                    default:
+                        http_response_code(404);
+                        return "No such unit to get";
+                }
+                break;
+            case "user":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {//authToken
+                    if (isset($request[3])) {//group/device/application
+                        switch ($request[3]) {
+                            case "group":
+                                if (isset($request[4])) if ($this->databaseFunctions->addGroupToUser($request[2], $request[4])) http_response_code(201); else http_response_code(409);
+                                break;
+                            case "device":
+                                if (isset($request[4])) if ($this->databaseFunctions->addDeviceToUser($request[2], $request[4])) http_response_code(201); else http_response_code(409);
+                                break;
+                            case "application":
+                                if (isset($request[4])) if ($this->databaseFunctions->addApplicationToUser($request[2], $request[4])) http_response_code(201); else http_response_code(409);
+                                break;
+                        }
+                    } else {
+
+                    }
+                } else {
+                    if ($this->databaseFunctions->addUser($postjson)) {
+                        http_response_code(201);
+                    } else {
+                        http_response_code(400);
+                    }
+                }
+                break;
+            case "group":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {//groupID
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "application":
+                                if (isset($request[4])) {//applicationID
+                                    $this->databaseFunctions->addApplicationToGroup($request[2], $request[4]);
+                                }
+                        }
+                    }
+
+                } else {
+                    $this->databaseFunctions->createGroup($postjson);
+                }
+                break;
+            default:
+                http_response_code(404);
+                return "No such unit to get";
+        }
+        return null;
+    }
+
+    public function put($request)
+    {
+        $this->authorizeAdmin();
+        $putjson = file_get_contents("php://input");
+
+        switch ($request[1]) {
+            case "user":
+                if (isset($request[2])) {
+                    $this->databaseFunctions->updateUser($request[2], $putjson);
+                }
+                break;
+            case "device":
+                if (isset($request[2])) {
+                    if ($this->databaseFunctions->updateDevice($request[2], $putjson)) {
+
+                    } else {
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "xmlsetting":
+                if (isset($request[2])) {
+                    if ($this->databaseFunctions->updateXmlSetting($request[2], $putjson)) {
+
+                    } else {
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "sqlsetting":
+                if (isset($request[2])) {
+                    if ($this->databaseFunctions->updateSqlSetting($request[2], $putjson)) {
+
+                    } else {
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+        }
+    }
+
+    public function delete($request)
+    {
+        $this->authorizeAdmin();
+        switch ($request[1]) {
+            case "user": //DELETE /user/{authToken}/groups/{groupID}.json
+                if (isset($request[2])) {
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "group":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeGroupFromUser($request[2], $request[4])) http_response_code(204);
+                                break;
+                            case "device":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeDeviceFromUser($request[2], $request[4])) http_response_code(204);
+                                break;
+                            case "application":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromUser($request[2], $request[4])) http_response_code(204);
+                                break;
+                        }
+                    } else {
+                        if (!$this->databaseFunctions->deleteUser($request[2])) http_response_code(400);
+                    }
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "group":
+                if (isset($request[2])) {
+                    $this->databaseFunctions->deleteGroup($request[2]);
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "device":
+                if (isset($request[2])) {
+                    $this->databaseFunctions->deleteDevice($request[2]);
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "application":
+                if (isset($request[2])) {
+                    $this->databaseFunctions->deleteApplication($request[2]);
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "admin":
+                switch ($request[2]) {
+                    case "login":
+                        $this->authorizeAdmin(true);
+                        break;
+                }
+                break;
+        }
+
     }
 }

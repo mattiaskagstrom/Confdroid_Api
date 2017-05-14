@@ -22,28 +22,25 @@ $fileType = $request[1];
 $request = explode("/", $request[0]);
 unset($request[0]);
 $output = null;
-$db = new DatabaseConnection();
+$requestParser = new RequestParser();
 switch ($method) {
     case 'PUT':
-        $output = $db->put($request);
+        $output = $requestParser->put($request);
         break;
     case 'POST':
-        $output = $db->post($request);
-
+        $output = $requestParser->post($request);
         break;
     case 'GET':
-        $output = $db->get($request);
-
+        $output = $requestParser->get($request);
         break;
     case 'HEAD':
         http_response_code(501);
         break;
     case 'DELETE':
-        $output = $db->delete($request);
+        $output = $requestParser->delete($request);
         break;
     case 'OPTIONS':
         header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
-        //http_response_code(501);
         break;
     default:
         //handle_error($request);

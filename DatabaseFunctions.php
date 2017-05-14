@@ -6,16 +6,26 @@
  * Date: 2017-04-12
  * Time: 15:44
  */
-class AdminFunctions
+spl_autoload_register(function ($class_name) {
+    /** @noinspection PhpIncludeInspection */
+    include $class_name . '.php';
+});
+class DatabaseFunctions
 {
     /**
      * @var PDO
      */
     private $dbc;
 
-    function __construct($dbc)
+    function __construct()
     {
-        $this->dbc = $dbc;
+        $dsn = 'mysql:host=localhost;dbname=confdroid_test';
+        $username = 'confdroid_test';
+        $password = 'tutus';
+        $options = array(
+            PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8',
+        );
+        $this->dbc = new PDO($dsn, $username, $password, $options);
     }
 
     /**
@@ -87,20 +97,17 @@ class AdminFunctions
     /**
      * Search on user
      * @param string $name
-     * @param string $mail
      * @return Mixed
      */
-    public function searchUsers($name = "", $mail = "")
+    public function searchUsers($name = "")
     {
         $stmt = $this->dbc->prepare("SELECT * FROM user WHERE name LIKE :name"); //OR mail LIKE :mail
         $name = "%" . $name . "%";
-        //$mail = "%" . $mail . "%";
         $stmt->bindParam(":name", $name);
-        //$stmt->bindParam(":mail", $mail); //removed due to search should only be on name
         $stmt->execute();
         $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
         $i = 0;
-
+        $users=array(User::class);
         if (isset($queriedUsers[0])) {
             foreach ($queriedUsers as $user) {
                 $users[$i] = new User($user["id"], $user["name"], $user["mail"], $user["auth_token"], $user["date_created"]);
@@ -115,8 +122,7 @@ class AdminFunctions
         return $users;
     }
 
-    public function getUser($authToken, $imei = null)
-    {
+    public function getUserWithAuthtoken($authToken, $imei){
         $stmt = $this->dbc->prepare("SELECT * FROM user WHERE BINARY auth_token=:authToken");
         $stmt->bindParam(":authToken", $authToken);
         $stmt->execute();
@@ -124,13 +130,25 @@ class AdminFunctions
 
         if (isset($queriedUsers[0])) {
             $user = new User($queriedUsers[0]["id"], $queriedUsers[0]["name"], $queriedUsers[0]["mail"], $queriedUsers[0]["auth_token"], $queriedUsers[0]["date_created"]);
-            if ($imei == null) {
-                $user->addDevices($this->getDevices($user->getId()));
-            } else {
-                $device = $this->getDevice($imei, $user);
-                if($device)$user->addDevice($device);else http_response_code(400);
+            $device = $this->getDevice($imei, $user, true);
+            if ($device) $user->addDevice($device); else http_response_code(400);
+            $user->addGroups($this->getGroupsByUserId($user->getId()));
+            $user = $this->getApplications(null, $user);
+            return $user;
+        }
 
-            }
+        return null;
+    }
+
+    public function getUserWithID($id){
+        $stmt = $this->dbc->prepare("SELECT * FROM user WHERE id=:id");
+        $stmt->bindParam(":id", $id);
+        $stmt->execute();
+        $queriedUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (isset($queriedUsers[0])) {
+            $user = new User($queriedUsers[0]["id"], $queriedUsers[0]["name"], $queriedUsers[0]["mail"], $queriedUsers[0]["auth_token"], $queriedUsers[0]["date_created"]);
+            $user->addDevices($this->getDevices($user->getId()));
             $user->addGroups($this->getGroupsByUserId($user->getId()));
             $user = $this->getApplications(null, $user);
             return $user;
@@ -162,14 +180,22 @@ class AdminFunctions
         return null;
     }
 
-    public function getDevice($imei, User $user = null)
+    public function getDevice($identifier, User $user = null, $isImei = false)
     {
-        if($user == null){
-            $stmt = $this->dbc->prepare("SELECT device.* FROM device WHERE device.imei=:imei");
-            $stmt->bindParam(":imei", $imei);
+        if($isImei){
+            $stmt = $this->dbc->prepare("SELECT id FROM device WHERE imei=:imei");
+            $stmt->bindParam(":imei", $identifier);
+            $stmt->execute();
+            $id = $stmt->fetchAll(PDO::FETCH_ASSOC)[0]["id"];
         }else{
-            $stmt = $this->dbc->prepare("SELECT device.* FROM device, user_device WHERE device.imei=:imei AND user_device.device_id=device.id AND user_device.user_id=:userID");
-            $stmt->bindParam(":imei", $imei);
+            $id=$identifier;
+        }
+        if($user == null){
+            $stmt = $this->dbc->prepare("SELECT device.* FROM device WHERE device.id=:id");
+            $stmt->bindParam(":id", $id);
+        }else{
+            $stmt = $this->dbc->prepare("SELECT device.* FROM device, user_device WHERE device.id=:id AND user_device.device_id=device.id AND user_device.user_id=:userID");
+            $stmt->bindParam(":id", $id);
             $stmt->bindParam(":userID", $user->getID());
         }
 
@@ -219,11 +245,11 @@ class AdminFunctions
         }
     }
 
-    public function addDeviceToUser($userToken, $imei)
+    public function addDeviceToUser($userID, $deviceID)
     {
-        $stmt = $this->dbc->prepare("INSERT INTO user_device(user_id, device_id) VALUES((SELECT id FROM user WHERE auth_token=:authToken), (SELECT id FROM device WHERE imei=:imei))");
-        $stmt->bindParam(":authToken", $userToken);
-        $stmt->bindParam(":imei", $imei);
+        $stmt = $this->dbc->prepare("INSERT INTO user_device(user_id, device_id) VALUES(:userID, :deviceID)");
+        $stmt->bindParam(":userID", $userID);
+        $stmt->bindParam(":deviceID", $deviceID);
         $stmt->execute();
         if($stmt->errorCode()=="00000"){
             return true;
@@ -232,11 +258,11 @@ class AdminFunctions
         }
     }
 
-    public function removeDeviceFromUser($userToken, $imei)
+    public function removeDeviceFromUser($userID, $deviceID)
     {
-        $stmt = $this->dbc->prepare("DELETE FROM user_device WHERE device_id=(SELECT id FROM device WHERE imei=:imei) AND user_id=(SELECT id FROM user WHERE auth_token=:authToken)");
-        $stmt->bindParam(":authToken", $userToken);
-        $stmt->bindParam(":imei", $imei);
+        $stmt = $this->dbc->prepare("DELETE FROM user_device WHERE device_id=:deviceID AND user_id=:userID");
+        $stmt->bindParam(":userID", $userID);
+        $stmt->bindParam(":deviceID", $deviceID);
         $stmt->execute();
         return true;
     }
@@ -249,7 +275,7 @@ class AdminFunctions
         $stmt->execute();
         $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (isset($stmtAnswer[0])) {
-            $devices = null;
+            $devices = array(Device::class);
             for ($i = 0; $i < count($stmtAnswer); $i++) {
                 $devices[$i] = new Device($stmtAnswer[$i]["id"], $stmtAnswer[$i]["name"], $stmtAnswer[$i]["imei"], $stmtAnswer[$i]["date_created"]);
                 $devices[$i] = $this->getApplications($devices[$i]);
@@ -286,10 +312,10 @@ class AdminFunctions
         }
     }
 
-    public function removeApplicationFromUser($userToken, $applicationID)
+    public function removeApplicationFromUser($userID, $applicationID)
     {
-        $stmt = $this->dbc->prepare("DELETE FROM application_user WHERE application_id=:applicationID AND user_id=(SELECT id FROM user WHERE auth_token=:authToken)");
-        $stmt->bindParam(":authToken", $userToken);
+        $stmt = $this->dbc->prepare("DELETE FROM application_user WHERE application_id=:applicationID AND user_id=:userID");
+        $stmt->bindParam(":userID", $id);
         $stmt->bindParam(":applicationID", $applicationID);
         $stmt->execute();
         return true;
@@ -311,6 +337,7 @@ class AdminFunctions
     /**
      * Returns all the applications on a device.
      * @param $device
+     * @param $user
      * @return mixed
      */
     private function getApplications(Device $device = null, User $user = null)
@@ -441,6 +468,7 @@ class AdminFunctions
         $stmt->execute();
         $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (isset($stmtAnswer[0])) {
+            $groups = array(Group::class);
             for ($i = 0; $i < count($stmtAnswer); $i++) {
                 $groups[$i] = new Group($stmtAnswer[$i]["id"], $stmtAnswer[$i]["prio"], $stmtAnswer[$i]["name"]);
             }
@@ -449,19 +477,19 @@ class AdminFunctions
         return null;
     }
 
-    public function removeGroupFromUser($userToken, $groupID)
+    public function removeGroupFromUser($userID, $groupID)
     {
-        $stmt = $this->dbc->prepare("DELETE FROM user_group WHERE group_id=:groupID AND user_id=(SELECT id FROM user WHERE auth_token=:authToken)");
-        $stmt->bindParam(":authToken", $userToken);
+        $stmt = $this->dbc->prepare("DELETE FROM user_group WHERE group_id=:groupID AND user_id=:userID");
+        $stmt->bindParam(":userID", $userID);
         $stmt->bindParam(":groupID", $groupID);
         $stmt->execute();
         return true;
     }
 
-    public function addGroupToUser($userToken, $groupID)
+    public function addGroupToUser($userID, $groupID)
     {
-        $stmt = $this->dbc->prepare("INSERT INTO user_group(user_id, group_id) VALUES((SELECT id FROM user WHERE auth_token=:authToken), :groupID)");
-        $stmt->bindParam(":authToken", $userToken);
+        $stmt = $this->dbc->prepare("INSERT INTO user_group(user_id, group_id) VALUES(:userID, :groupID)");
+        $stmt->bindParam(":userID", $userID);
         $stmt->bindParam(":groupID", $groupID);
         $stmt->execute();
         if($stmt->errorCode()=="00000"){
@@ -510,37 +538,31 @@ class AdminFunctions
         return false;
     }
 
-    public function removeUser($id = null, $token = null)
+    public function deleteUser($id)
     {
-        if (isset($id) && isset($token)) {
-            $stmt = $this->dbc->prepare("DELETE FROM user WHERE id=:id AND auth_token=:token;");
-            $stmt->bindParam(":id", $id);
-            $stmt->bindParam(":token", $token);
-        } else if (isset($id)) {
-            $stmt = $this->dbc->prepare("DELETE FROM user WHERE id=:id;");
-            $stmt->bindParam(":id", $id);
-
-        } else if (isset($token)) {
-            $stmt = $this->dbc->prepare("DELETE FROM user WHERE auth_token=:token;");
-            $stmt->bindParam(":token", $token);
-
-        } else {
-            return false;
-        }
+        $stmt = $this->dbc->prepare("DELETE FROM user WHERE id=:id;");
+        $stmt->bindParam(":id", $id);
         $stmt->execute();
         if ($stmt->errorCode() == 00000) return true;
         return false;
     }
 
+    public function deleteDevice($id){
+
+    }
+
+    public function deleteApplication($id){
+
+    }
 
     public function updateUser($userToken, $name = null, $mail = null)
     {
-        $sqlstatement = "UPDATE user SET";
+        /*$sqlstatement = "UPDATE user SET";
         if ($name != null) $sqlstatement .= " name=:name";
         if ($name != null && $mail != null) $sqlstatement .= ", ";
         if ($mail != null) $sqlstatement .= " mail=:mail ";
         $sqlstatement .= "WHERE auth_token:token";
-        var_dump($sqlstatement);
+        var_dump($sqlstatement);*/
     }
 
     public function searchGroups($groupName)
@@ -551,7 +573,7 @@ class AdminFunctions
         $stmt->execute();
         $stmtAnswer = $stmt->fetchAll(PDO::FETCH_ASSOC);
         if (isset($stmtAnswer[0])) {
-            $groups = null;
+            $groups = array(Group::class);
             for ($i = 0; $i < count($stmtAnswer); $i++) {
                 $groups[$i] = new Group($stmtAnswer[$i]["id"], $stmtAnswer[$i]["prio"], $stmtAnswer[$i]["name"]);
                 $groups[$i] = $groups[$i]->getObject();

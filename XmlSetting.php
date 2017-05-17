@@ -9,14 +9,15 @@
 class XmlSetting
 {
 
-    private $fileLocation, $regexp, $replaceWith, $id;
+    private $fileLocation, $regexp, $replaceWith, $id, $friendlyName;
 
-    public function __construct($id, $fileLocation, $regexp, $replaceWith)
+    public function __construct($id, $fileLocation, $regexp, $replaceWith, $friendlyName)
     {
         $this->id = $id;
         $this->fileLocation=$fileLocation;
         $this->regexp = $regexp;
         $this->replaceWith = $replaceWith;
+        $this->friendlyName = $friendlyName;
     }
 
     /**
@@ -48,7 +49,12 @@ class XmlSetting
         $array["fileLocation"] = $this->fileLocation;
         $array["regexp"] = $this->regexp;
         $array["replaceWith"] = $this->replaceWith;
+        $array["name"] = $this->friendlyName;
         return $array;
     }
 
+    public function replaceVariable($varName, $newValue, $variable){
+        $this->fileLocation = str_replace("{%" . $varName . "%}",$newValue,$this->query);
+        $this->replaceWith = str_replace("{%" . $varName . "%}",$newValue,$this->dblocation);
+    }
 }

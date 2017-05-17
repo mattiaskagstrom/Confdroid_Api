@@ -68,7 +68,17 @@ class RequestParser
                             return "No device found";
                         }
                     } else {
-                        if ($this->authorizeAdmin()) {//admin is requesting a specific user using id
+                        if ($this->authorizeAdmin()) {
+                            if (isset($request[3])) {
+                                if ($request[3] == "variable") {
+                                    if (isset($request[4])) {
+                                        if (isset($request[3])) return $this->databaseFunctions->getVariableForUser($request[2], $request[4]); else http_response_code(400);
+                                    } else {
+                                        if (isset($request[3])) return $this->databaseFunctions->getVariableForUser($request[2]); else http_response_code(400);
+                                    }
+                                }
+                            }
+
                             $user = $this->databaseFunctions->getUserWithID($request[2]);
                             if ($user == null) {
                                 http_response_code(404);
@@ -94,10 +104,10 @@ class RequestParser
             case "device":
                 $this->authorizeAdmin();
                 if (isset($request[2])) {
-                    $device = $this->databaseFunctions->getDevice($request[2]);//with id
+                    $device = $this->databaseFunctions->getDevice($request[2], null, false);//with id
                     if ($device == null) {
                         http_response_code(404);
-                        return "no device with that imei";
+                        return "no device with that id";
                     } else {
                         return $device->getObject();
                     }
@@ -121,7 +131,61 @@ class RequestParser
                 if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
                 return $this->databaseFunctions->searchApplications($searchValue);
                 break;
+            case "sqlsetting":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {
+                    $sqlSetting = $this->databaseFunctions->searchSqlSettings(null, $request[2]);
+                    if ($sqlSetting == null) {
+                        http_response_code(404);
+                        return "no SQL setting with that id";
+                    } else {
+                        return $sqlSetting[0];
+                    }
+                }
+                $searchValue = null;
+                if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
+                return $this->databaseFunctions->searchSqlSettings($searchValue);
 
+                break;
+            case "xmlsetting":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {
+                    $XmlSetting = $this->databaseFunctions->searchXmlSettings(null, $request[2]);
+                    if ($XmlSetting == null) {
+                        http_response_code(404);
+                        return "no XML setting with that id";
+                    } else {
+                        return $XmlSetting[0];
+                    }
+                }
+                $searchValue = null;
+                if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
+                return $this->databaseFunctions->searchXmlSettings($searchValue);
+                break;
+            case "variable":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {
+                    if ($request[2] == "user") {
+                        if (isset($request[3])) return $this->databaseFunctions->getVariableForUser($request[3]); else http_response_code(400);
+                    }
+                    if (isset($request[3])) {
+                        if ($request[3] == "user") {
+                            if (isset($request[4])) return $this->databaseFunctions->getVariableForUser($request[4], $request[2]); else http_response_code(400);
+                        }
+                    } else {
+                        $variable = $this->databaseFunctions->getVariable(null, $request[2]);
+                        if ($variable == null) {
+                            http_response_code(404);
+                            return "no variable with that id";
+                        } else {
+                            return $variable[0];
+                        }
+                    }
+                }
+                $searchValue = null;
+                if (isset($_GET["searchValue"])) $searchValue = $_GET["searchValue"];
+                return $this->databaseFunctions->getVariable($searchValue);
+                break;
         }
         http_response_code(404);
         return "no such resource";
@@ -183,6 +247,8 @@ class RequestParser
                             case "application":
                                 if (isset($request[4])) if ($this->databaseFunctions->addApplicationToUser($request[2], $request[4])) http_response_code(201); else http_response_code(409);
                                 break;
+                            case "variable":
+                                $this->databaseFunctions->setVariable($request[4], $request[2], json_decode($postjson, true)["value"]);
                         }
                     } else {
 
@@ -204,11 +270,106 @@ class RequestParser
                                 if (isset($request[4])) {//applicationID
                                     $this->databaseFunctions->addApplicationToGroup($request[2], $request[4]);
                                 }
+                                break;
+                            case "user":
+                                if (isset($request[4])) if ($this->databaseFunctions->addGroupToUser($request[4], $request[2])) http_response_code(201); else http_response_code(409);
+                                break;
                         }
                     }
 
                 } else {
                     $this->databaseFunctions->createGroup($postjson);
+                }
+                break;
+            case "application":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {//applicationID
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "group":
+                                if (isset($request[4])) {//applicationID
+                                    $this->databaseFunctions->addApplicationToGroup($request[4], $request[2]);
+                                }
+                                break;
+                            case "user":
+                                if (isset($request[4])) if ($this->databaseFunctions->addApplicationToUser($request[4], $request[2])) http_response_code(201); else http_response_code(409);
+                                break;
+                            case "device":
+                                if (isset($request[4])) if ($this->databaseFunctions->addApplicationToDevice($request[4], $request[2])) http_response_code(201); else http_response_code(409);
+                                break;
+                            case "sqlsetting":
+                                if (isset($request[4])) if ($this->databaseFunctions->addApplicationToSqlSetting($request[4], $request[2])) http_response_code(201); else http_response_code(409);
+                                break;
+                            case "xmlsetting":
+                                if (isset($request[4])) if ($this->databaseFunctions->addApplicationToXmlSetting($request[4], $request[2])) http_response_code(201); else http_response_code(409);
+                                break;
+                        }
+                    }
+                } else {
+                    if ($this->databaseFunctions->createApplication($postjson)) {
+                        http_response_code(201);
+                    } else {
+                        http_response_code(400);
+                    }
+                }
+                break;
+            case "device":
+                if (isset($request[2])) {//deviceID
+                    $this->authorizeAdmin();
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "user":
+                                if (isset($request[4])) if ($this->databaseFunctions->addDeviceToUser($request[4], $request[2])) http_response_code(201); else http_response_code(409);
+                                break;
+                            case "application":
+                                if (isset($request[4])) if ($this->databaseFunctions->addApplicationToDevice($request[2], $request[4])) http_response_code(201); else http_response_code(409);
+                                break;
+                        }
+                    }
+                } else {
+                    $this->databaseFunctions->createDevice($postjson);
+                }
+                break;
+            case "sqlsetting":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {//deviceID
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "application":
+                                if (isset($request[4])) if ($this->databaseFunctions->addApplicationToSqlSetting($request[2], $request[4])) http_response_code(201); else http_response_code(409);
+                                break;
+                        }
+                    }
+                } else {
+                    $this->databaseFunctions->createSqlSetting($postjson);
+                }
+                break;
+            case "xmlsetting":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {//deviceID
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "application":
+                                if (isset($request[4])) if ($this->databaseFunctions->addApplicationToXmlSetting($request[2], $request[4])) http_response_code(201); else http_response_code(409);
+                                break;
+                        }
+                    }
+                } else {
+                    $this->databaseFunctions->createXmlSetting($postjson);
+                }
+                break;
+            case "variable":
+                $this->authorizeAdmin();
+                if (isset($request[2])) {
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "user":
+                                $this->databaseFunctions->setVariable($request[2], $request[4], json_decode($postjson, true)["value"]);
+                                break;
+                        }
+                    }
+                } else {
+                    $this->databaseFunctions->createVariable($postjson);
                 }
                 break;
             default:
@@ -226,12 +387,41 @@ class RequestParser
         switch ($request[1]) {
             case "user":
                 if (isset($request[2])) {
-                    $this->databaseFunctions->updateUser($request[2], $putjson);
+                    if (isset($request[3])) {
+                        if ($request[3] == "variable") {
+                            if (isset($request[4])) {
+                                $this->databaseFunctions->setVariable($request[4], $request[2], json_decode($putjson, true)["value"]);
+                            } else {
+                                http_response_code(400);
+                            }
+                        }
+                    } else {
+                        if ($this->databaseFunctions->updateUser($request[2], $putjson)) {
+
+                        } else {
+                            http_response_code(400);
+                        }
+                    }
+
+                } else {
+                    http_response_code(400);
                 }
                 break;
             case "device":
                 if (isset($request[2])) {
                     if ($this->databaseFunctions->updateDevice($request[2], $putjson)) {
+
+                    } else {
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "group":
+                if (isset($request[2])) {
+                    if ($this->databaseFunctions->updateGroup($request[2], $putjson)) {
 
                     } else {
                         http_response_code(400);
@@ -265,6 +455,26 @@ class RequestParser
                     http_response_code(400);
                 }
                 break;
+            case "application":
+                if (isset($request[2])) {
+                    if ($this->databaseFunctions->updateApplication($request[2], $putjson)) {
+
+                    } else {
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "variable":
+                if (isset($request[3]) && isset($request[4])) {
+                    if ($request[3] == "user") {
+                        $this->databaseFunctions->setVariable($request[2], $request[4], json_decode($putjson, true)["value"]);
+                    }
+                }
+
+                break;
         }
     }
 
@@ -272,7 +482,7 @@ class RequestParser
     {
         $this->authorizeAdmin();
         switch ($request[1]) {
-            case "user": //DELETE /user/{authToken}/groups/{groupID}.json
+            case "user": //DELETE /user/{userID}/groups/{groupID}.json
                 if (isset($request[2])) {
                     if (isset($request[3])) {
                         switch ($request[3]) {
@@ -285,6 +495,9 @@ class RequestParser
                             case "application":
                                 if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromUser($request[2], $request[4])) http_response_code(204);
                                 break;
+                            case "varable":
+                                if (isset($request[4])) if ($this->databaseFunctions->unsetVariable($request[4], $request[2])) http_response_code(204);
+                                break;
                         }
                     } else {
                         if (!$this->databaseFunctions->deleteUser($request[2])) http_response_code(400);
@@ -295,7 +508,18 @@ class RequestParser
                 break;
             case "group":
                 if (isset($request[2])) {
-                    $this->databaseFunctions->deleteGroup($request[2]);
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "user":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeGroupFromUser($request[4], $request[2])) http_response_code(204);
+                                break;
+                            case "application":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromGroup($request[2], $request[4])) http_response_code(204);
+                                break;
+                        }
+                    } else {
+                        if (!$this->databaseFunctions->deleteGroup($request[2])) http_response_code(400);
+                    }
                     return;
                 } else {
                     http_response_code(400);
@@ -303,7 +527,19 @@ class RequestParser
                 break;
             case "device":
                 if (isset($request[2])) {
-                    $this->databaseFunctions->deleteDevice($request[2]);
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "user":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeDeviceFromUser($request[4], $request[2])) http_response_code(204);
+                                break;
+                            case "application":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromDevice($request[2], $request[4])) http_response_code(204);
+                                break;
+                        }
+                    } else {
+                        if (!$this->databaseFunctions->deleteDevice($request[2])) http_response_code(400);
+                    }
+
                     return;
                 } else {
                     http_response_code(400);
@@ -311,7 +547,52 @@ class RequestParser
                 break;
             case "application":
                 if (isset($request[2])) {
-                    $this->databaseFunctions->deleteApplication($request[2]);
+                    if (isset($request[3])) {
+                        switch ($request[3]) {
+                            case "user":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromUser($request[4], $request[2])) http_response_code(204);
+                                break;
+                            case "device":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromDevice($request[4], $request[2])) http_response_code(204);
+                                break;
+                            case "group":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromGroup($request[4], $request[2])) http_response_code(204);
+                                break;
+                            case "sqlsetting":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromSqlSetting($request[4], $request[2])) http_response_code(204);
+                                break;
+                            case "xmlsetting":
+                                if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromXmlSetting($request[4], $request[2])) http_response_code(204);
+                                break;
+                        }
+                    } else {
+                        if (!$this->databaseFunctions->deleteApplication($request[2])) http_response_code(400);
+                    }
+
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "xmlsetting":
+                if (isset($request[2])) {
+                    if ($this->databaseFunctions->deleteXmlSetting($request[2])) {
+
+                    } else {
+                        http_response_code(400);
+                    }
+                    return;
+                } else {
+                    http_response_code(400);
+                }
+                break;
+            case "sqlsetting":
+                if (isset($request[2])) {
+                    if ($this->databaseFunctions->deleteSqlSetting($request[2])) {
+
+                    } else {
+                        http_response_code(400);
+                    }
                     return;
                 } else {
                     http_response_code(400);
@@ -322,6 +603,22 @@ class RequestParser
                     case "login":
                         $this->authorizeAdmin(true);
                         break;
+                }
+                break;
+            case "variable":
+                if (isset($request[2])) {
+                    $this->databaseFunctions->deleteVariable($request[2]);
+                    if (isset($request[3])) {
+                        if(isset($request[4])){
+                            $this->databaseFunctions->unsetVariable($request[2], $request[4]);
+                        }else{
+                            http_response_code(400);
+                        }
+                    } else {
+
+                    }
+                }else{
+                    http_response_code(400);
                 }
                 break;
         }

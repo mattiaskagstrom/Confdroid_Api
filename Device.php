@@ -9,7 +9,7 @@
 class Device
 {
 
-    private $id, $name, $imei, $applications = array(), $dateCreated;
+    private $id, $name, $imei, $applications = array(), $dateCreated, $user;
 
     function __construct($id, $name, $imei, $dateCreated = null){
         $this->id = $id;
@@ -35,6 +35,7 @@ class Device
         $device["imei"] = $this->imei;
         $device["dateCreated"] = $this->dateCreated;
         $device["applications"] = $this->applications;
+        $device["user"] = $this->user;
         return $device;
     }
 
@@ -60,5 +61,13 @@ class Device
     public function getImei()
     {
         return $this->imei;
+    }
+
+    /**
+     * @param mixed $user
+     */
+    public function setUser($user)
+    {
+        $this->user = $user;
     }
 }

@@ -1,7 +1,7 @@
 <IfModule mod_rewrite.c>
 # Enable Rewrite Engine
     RewriteEngine On
-    RewriteBase /Confdroid_Api/
+    RewriteBase /
 # Map urls to api.php
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d

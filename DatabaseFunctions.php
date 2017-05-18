@@ -42,7 +42,7 @@ class DatabaseFunctions
         $salt->bindParam(":username", $username);
         $salt->execute();
         $salt = $salt->fetch()["salt"];
-        $passwordHash = hash("sha512", $password + $salt);
+        $passwordHash = hash("sha512", $password . $salt);
         $stmt->bindParam(":username", $username);
         $stmt->bindParam(":password", $passwordHash);
         $stmt->execute();
@@ -59,7 +59,7 @@ class DatabaseFunctions
             $insertAuth = $this->dbc->prepare("UPDATE admin SET authToken=:authToken, logintime=NOW(), ipaddr=:ipaddr WHERE username=:username AND password=:password ");
             $insertAuth->bindParam(":authToken", $token);
             $insertAuth->bindParam(":username", $username);
-            $insertAuth->bindParam(":password", $password);
+            $insertAuth->bindParam(":password", $passwordHash);
             $ip = $this->getRealIpAddr();
             $insertAuth->bindParam(":ipaddr", $ip);
             $insertAuth->execute();
@@ -178,13 +178,15 @@ class DatabaseFunctions
             $addTo = $device;
         } else if ($user != null && $device != null) {
             $stmt = $this->dbc->prepare("SELECT DISTINCT application.* FROM `application`, device, application_device, user, user_device WHERE `application`.id=application_device.application_id AND application_device.device_id=device.id AND device.id=:deviceID AND user.id = user_device.user_id AND application_device.device_id = user_device.device_id AND user.id=:userID UNION DISTINCT SELECT DISTINCT application.* FROM `application`, `user`, application_user WHERE `application`.id=application_user.application_id AND application_user.user_id=`user`.id AND user.id=:userID UNION DISTINCT SELECT DISTINCT application.* FROM `application`, `group`, application_group, user, user_group WHERE `application`.id=application_group.application_id AND application_group.group_id=`group`.id AND user.id = user_group.user_id AND application_group.group_id = user_group.group_id AND user.id=:userID");
-            $stmt->bindParam(":userID", $user->getId());
+            $userID = $user->getId();
+            $stmt->bindParam(":userID", $userID);
             $deviceId = $device->getId();
             $stmt->bindParam(":deviceID", $deviceId);
             $addTo = $device;
         } else if ($device == null && $user != null) {
             $stmt = $this->dbc->prepare("SELECT application.* FROM application, application_user WHERE application.id = application_user.application_id AND application_user.user_id =:userID");
-            $stmt->bindParam(":userID", $user->getId());
+            $userID = $user->getId();
+            $stmt->bindParam(":userID", $userID);
             $addTo = $user;
         } else {
             return $device;
@@ -311,7 +313,9 @@ class DatabaseFunctions
             $user = new User($queriedUsers[0]["id"], $queriedUsers[0]["name"], $queriedUsers[0]["mail"], $queriedUsers[0]["auth_token"], $queriedUsers[0]["date_created"]);
             $user->addDevices($this->getDevices($user->getId()));
             $user->addGroups($this->getGroupsByUserId($user->getId()));
+            $user->addVariables($this->getVariableForUser($user->getId()));
             $user = $this->getApplications(null, $user);
+
             return $user;
         }
 
@@ -1202,16 +1206,26 @@ class DatabaseFunctions
     }
     public function getVariableForUser($userID, $variableID = null){
         if($variableID != null){
-            $stmt = $this->dbc->prepare("SELECT * FROM user_variable WHERE variables_id=:variableID AND user_id=:userID");
+            $stmt = $this->dbc->prepare("SELECT * FROM user_variable, variables WHERE variables_id=:variableID AND user_id=:userID AND variables_id = variables.id");
             $stmt->bindParam(":variableID", $variableID);
         }else{
-            $stmt = $this->dbc->prepare("SELECT * FROM user_variable WHERE user_id=:userID");
+            $stmt = $this->dbc->prepare("SELECT * FROM user_variable, variables WHERE user_id=:userID AND variables_id = variables.id");
         }
         $stmt->bindParam(":userID", $userID);
 
         $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+
+        $returnValue = array();
+        foreach ($result as $item) {
+            $toPush["id"] = $item["id"];
+            $toPush["name"] = $item["name"];
+            $toPush["value"] = $item["value"];
+            array_push($returnValue, $toPush);
+        }
         if ($stmt->errorCode() == "00000") {
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            return $returnValue;
         } else {
             return false;
         }

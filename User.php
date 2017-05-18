@@ -12,7 +12,7 @@ spl_autoload_register(function ($class_name) {
 class User
 {
 
-    private $id, $name, $email, $devices = array(), $groups = array(), $authToken, $dateCreated, $applications = array();
+    private $id, $name, $email, $devices = array(), $groups = array(), $authToken, $dateCreated, $applications = array(), $variables = array();
 
     function __construct($id, $name, $email, $authToken = null, $dateCreated = null)
     {
@@ -43,6 +43,7 @@ class User
         $user["devices"] = $this->devices;
         $user["groups"] = $this->groups;
         $user["applications"] = $this->applications;
+        $user["variables"] = $this->variables;
         return $user;
     }
 
@@ -63,6 +64,17 @@ class User
 
     public function addGroup(Group $group){
         array_push($this->groups, $group->getObject());
+    }
+
+    public function addVariable($id, $name, $value){
+        $variable["id"] = $id;
+        $variable["name"] = $name;
+        $variable["value"] = $value;
+        array_push($this->variables, $variable);
+    }
+
+    public function addVariables($variables){
+        $this->variables = array_merge($this->variables, $variables);
     }
 
     /**

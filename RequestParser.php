@@ -68,26 +68,24 @@ class RequestParser
                             return "No device found";
                         }
                     } else {
-                        if ($this->authorizeAdmin()) {
-                            if (isset($request[3])) {
-                                if ($request[3] == "variable") {
-                                    if (isset($request[4])) {
-                                        if (isset($request[3])) return $this->databaseFunctions->getVariableForUser($request[2], $request[4]); else http_response_code(400);
-                                    } else {
-                                        if (isset($request[3])) return $this->databaseFunctions->getVariableForUser($request[2]); else http_response_code(400);
-                                    }
+                        //$this->authorizeAdmin();
+                        if (isset($request[3])) {
+                            if ($request[3] == "variable") {
+                                if (isset($request[4])) {
+                                    if (isset($request[3])) return $this->databaseFunctions->getVariableForUser($request[2], $request[4]); else http_response_code(400);
+                                } else {
+                                    if (isset($request[3])) return $this->databaseFunctions->getVariableForUser($request[2]); else http_response_code(400);
                                 }
                             }
-
-                            $user = $this->databaseFunctions->getUserWithID($request[2]);
-                            if ($user == null) {
-                                http_response_code(404);
-                                die();
-                            }
-                            return $user->getObject();
-                        } else {
-                            http_response_code(400);
                         }
+
+                        $user = $this->databaseFunctions->getUserWithID($request[2]);
+                        if ($user == null) {
+                            http_response_code(404);
+                            die();
+                        }
+                        return $user->getObject();
+
                     }
                 }
                 break;
@@ -248,7 +246,14 @@ class RequestParser
                                 if (isset($request[4])) if ($this->databaseFunctions->addApplicationToUser($request[2], $request[4])) http_response_code(201); else http_response_code(409);
                                 break;
                             case "variable":
-                                $this->databaseFunctions->setVariable($request[4], $request[2], json_decode($postjson, true)["value"]);
+
+                                if (isset($request[4])) {
+                                    if (isset(json_decode($postjson, true)["value"])){
+                                        if ($this->databaseFunctions->setVariable($request[4], $request[2], json_decode($postjson, true)["value"])) http_response_code(201); else http_response_code(409);
+                                    }else{
+                                        http_response_code(400);
+                                    }
+                                }
                         }
                     } else {
 
@@ -609,15 +614,15 @@ class RequestParser
                 if (isset($request[2])) {
                     $this->databaseFunctions->deleteVariable($request[2]);
                     if (isset($request[3])) {
-                        if(isset($request[4])){
+                        if (isset($request[4])) {
                             $this->databaseFunctions->unsetVariable($request[2], $request[4]);
-                        }else{
+                        } else {
                             http_response_code(400);
                         }
                     } else {
 
                     }
-                }else{
+                } else {
                     http_response_code(400);
                 }
                 break;

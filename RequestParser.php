@@ -68,7 +68,7 @@ class RequestParser
                             return "No device found";
                         }
                     } else {
-                        //$this->authorizeAdmin();
+                        $this->authorizeAdmin();
                         if (isset($request[3])) {
                             if ($request[3] == "variable") {
                                 if (isset($request[4])) {
@@ -500,9 +500,11 @@ class RequestParser
                             case "application":
                                 if (isset($request[4])) if ($this->databaseFunctions->removeApplicationFromUser($request[2], $request[4])) http_response_code(204);
                                 break;
-                            case "varable":
+                            case "variable":
                                 if (isset($request[4])) if ($this->databaseFunctions->unsetVariable($request[4], $request[2])) http_response_code(204);
                                 break;
+                            default:
+                                http_response_code(400);
                         }
                     } else {
                         if (!$this->databaseFunctions->deleteUser($request[2])) http_response_code(400);

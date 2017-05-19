@@ -1129,11 +1129,11 @@ class DatabaseFunctions
         preg_match_all("/\\{%(.*?)%\\}/", $query, $queryMatches);
         preg_match_all("/\\{%(.*?)%\\}/", $dbLocation, $dbLocationMatches);
         $matches = $queryMatches[1];
-        array_merge($matches, $dbLocationMatches[1]);
+        $matches = array_merge($matches, $dbLocationMatches[1]);
         foreach ($matches as $match) {
             $stmt->bindParam(":variableName", $match);
             $stmt->execute();
-            $sqlSetting->replaceVariable($match, $stmt->fetch()["value"], "query");
+            $sqlSetting->replaceVariable($match, $stmt->fetch()["value"]);
         }
     }
 
@@ -1147,12 +1147,14 @@ class DatabaseFunctions
         preg_match_all("/\\{%(.*?)%\\}/", $fileLocation, $fileLocationMatches);
         preg_match_all("/\\{%(.*?)%\\}/", $replaceWith, $replaceWithMatches);
         $matches = $fileLocationMatches[1];
-        array_merge($matches, $replaceWithMatches[1]);
+        $matches = array_merge($matches, $replaceWithMatches[1]);
         foreach ($matches as $match) {
             $stmt->bindParam(":variableName", $match);
             $stmt->execute();
-            $xmlSetting->replaceVariable($match, $stmt->fetch()["value"], "query");
+            $xmlSetting->replaceVariable($match, $stmt->fetch()["value"]);
+
         }
+
     }
 
     public function getVariable($searchValue, $id = null)

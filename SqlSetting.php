@@ -42,7 +42,7 @@ class SqlSetting
         return $this->query;
     }
 
-    public function replaceVariable($varName, $newValue, $variable){
+    public function replaceVariable($varName, $newValue){
         $this->query = str_replace("{%" . $varName . "%}",$newValue,$this->query);
         $this->dblocation = str_replace("{%" . $varName . "%}",$newValue,$this->dblocation);
     }

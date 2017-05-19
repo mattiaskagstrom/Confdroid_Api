@@ -53,8 +53,8 @@ class XmlSetting
         return $array;
     }
 
-    public function replaceVariable($varName, $newValue, $variable){
-        $this->fileLocation = str_replace("{%" . $varName . "%}",$newValue,$this->query);
-        $this->replaceWith = str_replace("{%" . $varName . "%}",$newValue,$this->dblocation);
+    public function replaceVariable($varName, $newValue){
+        $this->fileLocation = str_replace("{%" . $varName . "%}",$newValue,$this->fileLocation);
+        $this->replaceWith = str_replace("{%" . $varName . "%}",$newValue,$this->replaceWith);
     }
 }

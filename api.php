@@ -19,7 +19,7 @@ if (sizeof($request) <= 1) {
 }
 
 $fileType = $request[1];
-$request = explode("/", $request[0]);
+$request = explode("/", $request[0]); // split the request by the slashes, and then remove the first "api"
 unset($request[0]);
 $output = null;
 $requestParser = new RequestParser();

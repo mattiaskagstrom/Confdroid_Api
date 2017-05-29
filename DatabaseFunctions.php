@@ -51,7 +51,7 @@ class DatabaseFunctions
         $adminSession["Token"] = null;
 
         if (!isset($user[0]["id"])) {
-
+            http_response_code(401);
             return null;
         } else {
             $adminSession["id"] = $user[0]["id"];
@@ -68,6 +68,10 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Returns the real ip of the user if the server has one.
+     * @return mixed
+     */
     function getRealIpAddr()
     {
         if (!empty($_SERVER['HTTP_CLIENT_IP']))   //check ip from share internet
@@ -105,6 +109,11 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Ivalidates the admin token
+     * @param $authToken
+     * @param $adminId
+     */
     public function logout($authToken, $adminId)
     {
         $stmt = $this->dbc->prepare("UPDATE admin SET authToken=NULL WHERE id=:adminID AND authToken=:authToken;");
@@ -227,6 +236,7 @@ class DatabaseFunctions
     }
 
     /**
+     * Returns all groups with a relation to the user with id $userId
      * @param $userId
      * @return Group[]
      */
@@ -246,6 +256,12 @@ class DatabaseFunctions
         return null;
     }
 
+    /**
+     * Gets a user with a specific user token
+     * @param $authToken
+     * @param $imei
+     * @return Device|null|User
+     */
     public function getUserWithAuthtoken($authToken, $imei)
     {
         $stmt = $this->dbc->prepare("SELECT * FROM user WHERE BINARY auth_token=:authToken");
@@ -265,6 +281,14 @@ class DatabaseFunctions
         return null;
     }
 
+    /**
+     * Gets a device with the specified identifier. the identifier defaults to a ID, but can be changes to be a imei if $isImei is set to true.
+     * if a user is specified, it returns only the device on the specified user.
+     * @param $identifier
+     * @param User|null $user
+     * @param bool $isImei
+     * @return Device|null
+     */
     public function getDevice($identifier, User $user = null, $isImei = false)
     {
         if ($isImei) {
@@ -302,6 +326,11 @@ class DatabaseFunctions
         return null;
     }
 
+    /**
+     * Gets a user with a specific ID
+     * @param $id
+     * @return Device|null|User
+     */
     public function getUserWithID($id)
     {
         $stmt = $this->dbc->prepare("SELECT * FROM user WHERE id=:id");
@@ -322,7 +351,12 @@ class DatabaseFunctions
         return null;
     }
 
-
+    /**
+     * Creates a new device from the data specified in the JSON
+     * required values: name, imei
+     * @param $json
+     * @return bool
+     */
     public function createDevice($json)
     {
         $device = json_decode($json, true);
@@ -346,6 +380,13 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Update a device with new information supplied from a json string.
+     * optional values: name, imei
+     * @param $deviceID
+     * @param $json
+     * @return bool
+     */
     public function updateDevice($deviceID, $json)
     {
         $device = json_decode($json, true);
@@ -383,6 +424,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Adds a device to a user.
+     * @param $userID
+     * @param $deviceID
+     * @return bool
+     */
     public function addDeviceToUser($userID, $deviceID)
     {
         $stmt = $this->dbc->prepare("INSERT INTO user_device(user_id, device_id) VALUES(:userID, :deviceID)");
@@ -396,6 +443,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Removes a device from a user.
+     * @param $userID
+     * @param $deviceID
+     * @return bool
+     */
     public function removeDeviceFromUser($userID, $deviceID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM user_device WHERE device_id=:deviceID AND user_id=:userID");
@@ -405,6 +458,11 @@ class DatabaseFunctions
         return true;
     }
 
+    /**
+     * Searches for a device where the names or imei contains $searchValue.
+     * @param $searchValue
+     * @return array|null
+     */
     public function searchDevices($searchValue)
     {
         $stmt = $this->dbc->prepare("SELECT id, name, imei, date_created FROM device WHERE device.name LIKE :searchValue OR device.imei LIKE :searchValue");
@@ -424,6 +482,12 @@ class DatabaseFunctions
         return null;
     }
 
+    /**
+     * Adds a application to a user.
+     * @param $userID
+     * @param $applicationID
+     * @return bool
+     */
     public function addApplicationToUser($userID, $applicationID)
     {
         $stmt = $this->dbc->prepare("INSERT INTO application_user(user_id, application_id) VALUES(:userID, :applicationID)");
@@ -437,6 +501,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Adds a application to a group.
+     * @param $groupID
+     * @param $applicationID
+     * @return bool
+     */
     public function addApplicationToGroup($groupID, $applicationID)
     {
         $stmt = $this->dbc->prepare("INSERT INTO application_group(group_id, application_id) VALUES(:groupID, :applicationID)");
@@ -450,6 +520,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Adds a application to a Device.
+     * @param $deviceID
+     * @param $applicationID
+     * @return bool
+     */
     public function addApplicationToDevice($deviceID, $applicationID)
     {
         $stmt = $this->dbc->prepare("INSERT INTO application_device(device_id, application_id) VALUES(:deviceID, :applicationID)");
@@ -463,6 +539,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Adds a sqlsetting to a application
+     * @param $sqlSettingID
+     * @param $applicationID
+     * @return bool
+     */
     public function addApplicationToSqlSetting($sqlSettingID, $applicationID)
     {
         $stmt = $this->dbc->prepare("INSERT INTO application_sql_setting(sql_setting_id, application_id) VALUES(:sqlSettingID, :applicationID)");
@@ -476,6 +558,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Adds a xmlsetting to a application.
+     * @param $xmlSettingID
+     * @param $applicationID
+     * @return bool
+     */
     public function addApplicationToXmlSetting($xmlSettingID, $applicationID)
     {
         $stmt = $this->dbc->prepare("INSERT INTO application_xml_setting(xml_setting_id, application_id) VALUES(:xmlSettingID, :applicationID)");
@@ -489,7 +577,12 @@ class DatabaseFunctions
         }
     }
 
-
+    /**
+     * Removes a application from a user.
+     * @param $userID
+     * @param $applicationID
+     * @return bool
+     */
     public function removeApplicationFromUser($userID, $applicationID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM application_user WHERE application_id=:applicationID AND user_id=:userID");
@@ -499,7 +592,12 @@ class DatabaseFunctions
         return true;
     }
 
-
+    /**
+     * Remove a application from a user.
+     * @param $groupID
+     * @param $applicationID
+     * @return bool
+     */
     public function removeApplicationFromGroup($groupID, $applicationID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM application_group WHERE group_id=:groupID AND application_id=:applicationID");
@@ -513,6 +611,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Removes a application from a device.
+     * @param $deviceID
+     * @param $applicationID
+     * @return bool
+     */
     public function removeApplicationFromDevice($deviceID, $applicationID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM application_device WHERE device_id=:deviceID AND application_id=:applicationID");
@@ -526,6 +630,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Removes a sqlsetting from a application.
+     * @param $sqlSettingID
+     * @param $applicationID
+     * @return bool
+     */
     public function removeApplicationFromSqlSetting($sqlSettingID, $applicationID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM application_sql_setting WHERE sql_setting_id=:sqlSettingID AND application_id=:applicationID");
@@ -539,6 +649,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Removes a xmlsetting from a application.
+     * @param $xmlSettingID
+     * @param $applicationID
+     * @return bool
+     */
     public function removeApplicationFromXmlSetting($xmlSettingID, $applicationID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM application_xml_setting WHERE xml_setting_id=:xmlSettingID AND application_id=:applicationID");
@@ -552,6 +668,13 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Creates a new application with the values supplied in the json string.
+     * required values: name, packageName.
+     * optional values: apkName, forceInstall, dataDir, apkURL.
+     * @param $json
+     * @return bool
+     */
     public function createApplication($json)
     {
         $application = json_decode($json, true);
@@ -585,6 +708,12 @@ class DatabaseFunctions
 
     }
 
+    /**
+     * Searches for application and return the ones that match friendly_name, package_name, apk_name or the ID = $appID.
+     * @param null $searchValue
+     * @param null $appID
+     * @return array
+     */
     public function searchApplications($searchValue = null, $appID = null)
     {
         if (!$appID) {
@@ -632,6 +761,12 @@ class DatabaseFunctions
         return $appArray;
     }
 
+    /**
+     * Returns sqlsettings that matches friendly_name
+     * @param null $searchValue
+     * @param null $sqlSettingID
+     * @return array
+     */
     public function searchSqlSettings($searchValue = null, $sqlSettingID = null)
     {
         if (!$sqlSettingID) {
@@ -652,6 +787,12 @@ class DatabaseFunctions
         return $sqlSettingArray;
     }
 
+    /**
+     * Returns xmlsettings that matches friendly_name
+     * @param null $searchValue
+     * @param null $XmlSettingID
+     * @return array
+     */
     public function searchXmlSettings($searchValue = null, $XmlSettingID = null)
     {
         if (!$XmlSettingID) {
@@ -672,7 +813,12 @@ class DatabaseFunctions
         return $xmlSettingArray;
     }
 
-
+    /**
+     * Removes a group from a user
+     * @param $userID
+     * @param $groupID
+     * @return bool
+     */
     public function removeGroupFromUser($userID, $groupID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM user_group WHERE group_id=:groupID AND user_id=:userID");
@@ -682,6 +828,12 @@ class DatabaseFunctions
         return true;
     }
 
+    /**
+     * Adds a group to a user.
+     * @param $userID
+     * @param $groupID
+     * @return bool
+     */
     public function addGroupToUser($userID, $groupID)
     {
         $stmt = $this->dbc->prepare("INSERT INTO user_group(user_id, group_id) VALUES(:userID, :groupID)");
@@ -695,6 +847,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Creates a group with the values supplied in the json string.
+     * required: prio, name
+     * @param $json
+     * @return bool
+     */
     public function createGroup($json)
     {
         $group = json_decode($json, true);
@@ -715,7 +873,12 @@ class DatabaseFunctions
         return false;
     }
 
-
+    /**
+     * Creates a new user with the values in the json string.
+     * required: name, mail.
+     * @param $json
+     * @return bool
+     */
     public function addUser($json)
     {
 
@@ -736,6 +899,11 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Deletes a user from the database.
+     * @param $id
+     * @return bool
+     */
     public function deleteUser($id)
     {
         $stmt = $this->dbc->prepare("DELETE FROM user WHERE id=:id;");
@@ -745,6 +913,11 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Deletes a device from the database.
+     * @param $deviceID
+     * @return bool
+     */
     public function deleteDevice($deviceID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM `device` WHERE id=:deviceID");
@@ -754,7 +927,11 @@ class DatabaseFunctions
         return false;
     }
 
-
+    /**
+     * Deletes a device from the database.
+     * @param $applicationID
+     * @return bool
+     */
     public function deleteApplication($applicationID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM `application` WHERE id=:applicationID");
@@ -764,6 +941,11 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Deletes a sqlsetting from the database.
+     * @param $sqlSettingID
+     * @return bool
+     */
     public function deleteSqlSetting($sqlSettingID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM `sql_setting` WHERE id=:sqlSettingID");
@@ -773,6 +955,11 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Deletes a xmlsetting from the database.
+     * @param $xmlSettingID
+     * @return bool
+     */
     public function deleteXmlSetting($xmlSettingID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM `xml_setting` WHERE id=:xmlSettingID");
@@ -782,6 +969,12 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Creates a sqlsetting fromt he values in the json string.
+     * required: query, dblocation, name.
+     * @param $json
+     * @return bool
+     */
     public function createSqlSetting($json)
     {
         $sqlSetting = json_decode($json, true);
@@ -802,6 +995,12 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Creates a xmlsetting fromt he values in the json string.
+     * required: fileLocation, regexp, replaceWith, name.
+     * @param $json
+     * @return bool
+     */
     public function createXmlSetting($json)
     {
         $xmlSetting = json_decode($json, true);
@@ -823,6 +1022,12 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Update a application with new values from the json string
+     * @param $applicationID
+     * @param $putJSON
+     * @return bool
+     */
     public function updateApplication($applicationID, $putJSON)
     {
         $application = json_decode($putJSON, true);
@@ -889,6 +1094,12 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Update a user with new values from the json.
+     * @param $userID
+     * @param $putJSON
+     * @return bool
+     */
     public function updateUser($userID, $putJSON)
     {
         $user = json_decode($putJSON, true);
@@ -931,6 +1142,11 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Returns all group where name contains groupName
+     * @param $groupName
+     * @return array|null
+     */
     public function searchGroups($groupName)
     {
         $stmt = $this->dbc->prepare("SELECT id, prio, name FROM `group` WHERE name LIKE :groupName");
@@ -950,6 +1166,11 @@ class DatabaseFunctions
         return null;
     }
 
+    /**
+     * Gets the group with the specified ID
+     * @param $groupID
+     * @return mixed
+     */
     public function getGroup($groupID)
     {
         $groupstmt = $this->dbc->prepare("SELECT id, prio, name FROM `group` WHERE id=:groupID");
@@ -978,6 +1199,12 @@ class DatabaseFunctions
 
     }
 
+    /**
+     * Update a group with new values from the json string.
+     * @param $groupID
+     * @param $putJSON
+     * @return bool
+     */
     public function updateGroup($groupID, $putJSON)
     {
         $group = json_decode($putJSON, true);
@@ -1015,6 +1242,11 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Deletes a group from the database.
+     * @param $groupID
+     * @return bool
+     */
     public function deleteGroup($groupID)
     {
         $stmt = $this->dbc->prepare("DELETE FROM `group` WHERE id=:groupID");
@@ -1024,6 +1256,12 @@ class DatabaseFunctions
         return false;
     }
 
+    /**
+     * Updates a sqlsetting with new values from the json string.
+     * @param $sqlSettingID
+     * @param $json
+     * @return bool
+     */
     public function updateSqlSetting($sqlSettingID, $json)
     {
         $sqlSetting = json_decode($json, true);
@@ -1067,7 +1305,12 @@ class DatabaseFunctions
         }
     }
 
-
+    /**
+     * Updates a xmlsetting with new values from the json string.
+     * @param $xmlSettingID
+     * @param $json
+     * @return bool
+     */
     public function updateXmlSetting($xmlSettingID, $json)
     {
         $xmlSetting = json_decode($json, true);
@@ -1119,6 +1362,11 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Evaluates the variables in the sqlsetting and replaces them with the specified users values.
+     * @param SqlSetting $sqlSetting
+     * @param User $user
+     */
     private function evaluateSqlSettingVariables(SqlSetting $sqlSetting, User $user)
     {
         $stmt = $this->dbc->prepare("SELECT value FROM user_variable WHERE user_id=:userID AND variables_id=(SELECT id FROM variables WHERE name=:variableName)");
@@ -1137,6 +1385,11 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Evaluates the variables in the xmlsetting and replaces them with the specified users values.
+     * @param XmlSetting $xmlSetting
+     * @param User $user
+     */
     private function evaluateXmlSettingVariables(XmlSetting $xmlSetting, User $user)
     {
         $stmt = $this->dbc->prepare("SELECT value FROM user_variable WHERE user_id=:userID AND variables_id=(SELECT id FROM variables WHERE name=:variableName)");
@@ -1157,6 +1410,12 @@ class DatabaseFunctions
 
     }
 
+    /**
+     * Searches for variables with names containing searchValue, or returns the variable with the specified id.
+     * @param $searchValue
+     * @param null $id
+     * @return array
+     */
     public function getVariable($searchValue, $id = null)
     {
         if ($id == null) {
@@ -1182,6 +1441,12 @@ class DatabaseFunctions
         return $variables;
     }
 
+    /**
+     * Creates a new variable with the name specified in the json string.
+     * required: name.
+     * @param $json
+     * @return bool
+     */
     public function createVariable($json){
         $variableName = json_decode($json, true)["name"];
         $stmt = $this->dbc->prepare("INSERT INTO variables(name) VALUES (:name)");
@@ -1194,6 +1459,13 @@ class DatabaseFunctions
         }
     }
 
+    /**
+     * Sets te variable value for the specified variable with the specified user.
+     * @param $variableID
+     * @param $userID
+     * @param $value
+     * @return bool
+     */
     public function setVariable($variableID, $userID, $value){
         $stmt = $this->dbc->prepare("INSERT INTO user_variable(user_id, variables_id, value) VALUES (:userID, :variableID, :value) ON DUPLICATE KEY UPDATE value=:value");
         $stmt->bindParam(":userID", $userID);
@@ -1206,6 +1478,13 @@ class DatabaseFunctions
             return false;
         }
     }
+
+    /**
+     * Gets all or the specified variable and its value(s) for the specified user.
+     * @param $userID
+     * @param null $variableID
+     * @return array|bool
+     */
     public function getVariableForUser($userID, $variableID = null){
         if($variableID != null){
             $stmt = $this->dbc->prepare("SELECT * FROM user_variable, variables WHERE variables_id=:variableID AND user_id=:userID AND variables_id = variables.id");
@@ -1233,6 +1512,12 @@ class DatabaseFunctions
         }
 
     }
+
+    /**
+     * Deletes a variable from the database.
+     * @param $variableID
+     * @return bool
+     */
     public function deleteVariable($variableID){
         $stmt = $this->dbc->prepare("DELETE FROM variables WHERE id=:variableID");
         $stmt->bindParam(":variableID", $variableID);
@@ -1243,9 +1528,34 @@ class DatabaseFunctions
             return false;
         }
     }
+
+    /**
+     * Removes the variables value from a user.
+     * @param $variableID
+     * @param $userID
+     * @return bool
+     */
     public function unsetVariable($variableID, $userID){
         $stmt = $this->dbc->prepare("DELETE FROM user_variable WHERE variables_id=:variableID AND user_id=:userID");
         $stmt->bindParam(":userID", $userID);
+        $stmt->bindParam(":variableID", $variableID);
+        $stmt->execute();
+        if ($stmt->errorCode() == "00000") {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    /**
+     * Changes the variables name to newName.
+     * @param $variableID
+     * @param $newName
+     * @return bool
+     */
+    public function changeVariableName($variableID, $newName){
+        $stmt = $this->dbc->prepare("UPDATE variables SET name=:newName WHERE id=:variableID");
+        $stmt->bindParam(":newName", $newName);
         $stmt->bindParam(":variableID", $variableID);
         $stmt->execute();
         if ($stmt->errorCode() == "00000") {
